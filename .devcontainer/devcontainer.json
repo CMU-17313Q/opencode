@@ -1,0 +1,20 @@
+{
+  "name": "opencode",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "24"
+    }
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --reinstall python3 python3-minimal libpython3-stdlib && curl -fsSL https://bun.sh/install | bash -s \"bun-v1.3.14\" && echo 'export PATH=\"$HOME/.bun/bin:$PATH\"' >> ~/.bashrc && ~/.bun/bin/bun install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "oven.bun-vscode"
+      ]
+    }
+  },
+  "remoteEnv": {
+    "PATH": "${containerEnv:HOME}/.bun/bin:${containerEnv:PATH}"
+  }
+}
