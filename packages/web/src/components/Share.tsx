@@ -21,21 +21,30 @@ function scrollToAnchor(id: string) {
   el.scrollIntoView({ behavior: "smooth" })
 }
 
-function getStatusText(status: [Status, string?], messages: Record<string, string>): string {
+export function getStatusText(status: [Status, string?], messages: Record<string, string>): string {
+  let text: string
+
   switch (status[0]) {
     case "connected":
-      return messages.status_connected_waiting
+      text = messages.status_connected_waiting
+      break
     case "connecting":
-      return messages.status_connecting
+      text = messages.status_connecting
+      break
     case "disconnected":
-      return messages.status_disconnected
+      text = messages.status_disconnected
+      break
     case "reconnecting":
-      return messages.status_reconnecting
+      text = messages.status_reconnecting
+      break
     case "error":
-      return status[1] || messages.status_error
+      text = status[1] || messages.status_error
+      break
     default:
-      return messages.status_unknown
+      text = messages.status_unknown
   }
+
+  return text
 }
 
 export default function Share(props: {
