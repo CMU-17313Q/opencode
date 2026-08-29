@@ -1,0 +1,4 @@
+{
+  "name": "Opencode-17313",
+  "build": { "dockerfile": "Dockerfile" }
+}
