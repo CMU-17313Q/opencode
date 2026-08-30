@@ -1,0 +1,5 @@
+{
+  "name": "Project 1A",
+  "image": "node:24-slim",
+  "workspaces": ["packages/*"]
+}
