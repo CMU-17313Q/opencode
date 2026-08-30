@@ -1,0 +1,11 @@
+{
+  "name": "opencode",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers-extra/features/bun:1": { "version": "latest" }
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y lcov",
+  "customizations": {
+    "vscode": { "extensions": ["oven.bun-vscode", "ms-vscode.live-server"] }
+  }
+}
