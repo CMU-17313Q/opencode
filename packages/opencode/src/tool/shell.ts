@@ -64,6 +64,7 @@ const CMD_FILES = new Set([
 ])
 const FLAGS = new Set(["-destination", "-literalpath", "-path"])
 const SWITCHES = new Set(["-confirm", "-debug", "-force", "-nonewline", "-recurse", "-verbose", "-whatif"])
+const PART_TYPES = new Set(["command_name", "command_name_expr", "word", "string", "raw_string", "concatenation"])
 
 type Part = {
   type: string
@@ -101,16 +102,7 @@ function parts(node: Node) {
       }
       continue
     }
-    if (
-      child.type !== "command_name" &&
-      child.type !== "command_name_expr" &&
-      child.type !== "word" &&
-      child.type !== "string" &&
-      child.type !== "raw_string" &&
-      child.type !== "concatenation"
-    ) {
-      continue
-    }
+    if (!PART_TYPES.has(child.type)) continue
     out.push({ type: child.type, text: child.text })
   }
   return out
