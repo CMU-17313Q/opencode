@@ -1,0 +1,13 @@
+ {
+  "name": "project 1A",
+  "image": "oven/bun:1",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Oven.bun-vscode"
+      ]
+    }
+  },
+  "postCreateCommand": "bun install"
+}
+
