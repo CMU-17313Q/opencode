@@ -1,0 +1,369 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - lcov-src.info - src/tool/shell/prompt.ts</title>
+  <link rel="stylesheet" type="text/css" href="../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../index.html">top level</a> - <a href="index.html">src/tool/shell</a> - prompt.ts<span style="font-size: 80%;"> (source / <a href="prompt.ts.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">lcov-src.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">73</td>
+            <td class="headerCovTableEntry">209</td>
+            <td class="headerCovTableEntryLo">34.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2026-08-30 16:30:13</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntryHi">-</td>
+          </tr>
+          <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span><span class="lineCov">         32 : import { Schema } from &quot;effect&quot;</span></a>
+<a name="2"><span class="lineNum">       2 </span><span class="lineCov">         38 : import DESCRIPTION from &quot;./shell.txt&quot;</span></a>
+<a name="3"><span class="lineNum">       3 </span><span class="lineCov">         55 : import { PositiveInt } from &quot;@opencode-ai/core/schema&quot;</span></a>
+<a name="4"><span class="lineNum">       4 </span><span class="lineCov">         50 : import { Global } from &quot;@opencode-ai/core/global&quot;</span></a>
+<a name="5"><span class="lineNum">       5 </span><span class="lineCov">         31 : import { ShellID } from &quot;./id&quot;</span></a>
+<a name="6"><span class="lineNum">       6 </span>            : </a>
+<a name="7"><span class="lineNum">       7 </span><span class="lineCov">         43 : const PS = new Set([&quot;powershell&quot;, &quot;pwsh&quot;])</span></a>
+<a name="8"><span class="lineNum">       8 </span><span class="lineCov">         29 : const CMD = new Set([&quot;cmd&quot;])</span></a>
+<a name="9"><span class="lineNum">       9 </span>            : </a>
+<a name="10"><span class="lineNum">      10 </span>            : export type Limits = {</a>
+<a name="11"><span class="lineNum">      11 </span>            :   maxLines: number</a>
+<a name="12"><span class="lineNum">      12 </span>            :   maxBytes: number</a>
+<a name="13"><span class="lineNum">      13 </span>            : }</a>
+<a name="14"><span class="lineNum">      14 </span>            : </a>
+<a name="15"><span class="lineNum">      15 </span><span class="lineCov">         11 : export function parameterSchema() {</span></a>
+<a name="16"><span class="lineNum">      16 </span><span class="lineCov">         26 :   return Schema.Struct({</span></a>
+<a name="17"><span class="lineNum">      17 </span><span class="lineCov">         79 :     command: Schema.String.annotate({ description: &quot;The command to execute&quot; }),</span></a>
+<a name="18"><span class="lineNum">      18 </span><span class="lineCov">        104 :     timeout: Schema.optional(PositiveInt).annotate({ description: &quot;Optional timeout in milliseconds&quot; }),</span></a>
+<a name="19"><span class="lineNum">      19 </span><span class="lineCov">         56 :     workdir: Schema.optional(Schema.String).annotate({</span></a>
+<a name="20"><span class="lineNum">      20 </span><span class="lineCov">        133 :       description: `The working directory to run the command in. Defaults to the current directory. Use this instead of 'cd' commands.`,</span></a>
+<a name="21"><span class="lineNum">      21 </span><span class="lineCov">          4 :     }),</span></a>
+<a name="22"><span class="lineNum">      22 </span><span class="lineCov">          3 :   })</span></a>
+<a name="23"><span class="lineNum">      23 </span>            : }</a>
+<a name="24"><span class="lineNum">      24 </span>            : </a>
+<a name="25"><span class="lineNum">      25 </span><span class="lineCov">         43 : export const Parameters = parameterSchema()</span></a>
+<a name="26"><span class="lineNum">      26 </span>            : export type Parameters = Schema.Schema.Type&lt;typeof Parameters&gt;</a>
+<a name="27"><span class="lineNum">      27 </span>            : </a>
+<a name="28"><span class="lineNum">      28 </span><span class="lineCov">         22 : function renderPrompt(template: string, values: Record&lt;string, string&gt;) {</span></a>
+<a name="29"><span class="lineNum">      29 </span><span class="lineCov">         56 :   return template.replace(/\$\{(\w+)\}/g, (_, key: string) =&gt; {</span></a>
+<a name="30"><span class="lineNum">      30 </span><span class="lineCov">         30 :     const value = values[key]</span></a>
+<a name="31"><span class="lineNum">      31 </span><span class="lineCov">         33 :     if (value === undefined) throw new Error(`Missing shell prompt value: ${key}`)</span></a>
+<a name="32"><span class="lineNum">      32 </span><span class="lineCov">         12 :     return value</span></a>
+<a name="33"><span class="lineNum">      33 </span><span class="lineCov">          1 :   })</span></a>
+<a name="34"><span class="lineNum">      34 </span>            : }</a>
+<a name="35"><span class="lineNum">      35 </span>            : </a>
+<a name="36"><span class="lineNum">      36 </span><span class="lineNoCov">          0 : function shellDisplayName(name: string) {</span></a>
+<a name="37"><span class="lineNum">      37 </span><span class="lineNoCov">          0 :   if (name === &quot;pwsh&quot;) return &quot;PowerShell (7+)&quot;</span></a>
+<a name="38"><span class="lineNum">      38 </span><span class="lineNoCov">          0 :   if (name === &quot;powershell&quot;) return &quot;Windows PowerShell (5.1)&quot;</span></a>
+<a name="39"><span class="lineNum">      39 </span><span class="lineNoCov">          0 :   if (name === &quot;cmd&quot;) return &quot;cmd.exe&quot;</span></a>
+<a name="40"><span class="lineNum">      40 </span>            :   return name</a>
+<a name="41"><span class="lineNum">      41 </span>            : }</a>
+<a name="42"><span class="lineNum">      42 </span>            : </a>
+<a name="43"><span class="lineNum">      43 </span><span class="lineNoCov">          0 : function powershellNotes(name: string) {</span></a>
+<a name="44"><span class="lineNum">      44 </span><span class="lineNoCov">          0 :   if (name === &quot;pwsh&quot;) {</span></a>
+<a name="45"><span class="lineNum">      45 </span><span class="lineNoCov">          0 :     return `# PowerShell (7+) shell notes</span></a>
+<a name="46"><span class="lineNum">      46 </span><span class="lineNoCov">          0 : - This cross-platform shell supports pipeline chain operators (\`&amp;&amp;\` and \`||\`).</span></a>
+<a name="47"><span class="lineNum">      47 </span><span class="lineNoCov">          0 : - Use double quotes for interpolated strings (\`&quot;Hello $name&quot;\`), single quotes for verbatim strings.</span></a>
+<a name="48"><span class="lineNum">      48 </span><span class="lineNoCov">          0 : - Prefer full cmdlet names like \`Get-ChildItem\`, \`Set-Content\`, \`Remove-Item\`, and \`New-Item\` over aliases.</span></a>
+<a name="49"><span class="lineNum">      49 </span><span class="lineNoCov">          0 : - Use \`$(...)\` for subexpressions. Use \`@(...)\` for array expressions.</span></a>
+<a name="50"><span class="lineNum">      50 </span><span class="lineNoCov">          0 : - To call a native executable whose path contains spaces, use the call operator: \`&amp; &quot;path/to/exe&quot; args\`.</span></a>
+<a name="51"><span class="lineNum">      51 </span><span class="lineNoCov">          0 : - Escape special characters with the PowerShell backtick character.`</span></a>
+<a name="52"><span class="lineNum">      52 </span><span class="lineNoCov">          0 :   }</span></a>
+<a name="53"><span class="lineNum">      53 </span><span class="lineNoCov">          0 :   if (name === &quot;powershell&quot;) {</span></a>
+<a name="54"><span class="lineNum">      54 </span><span class="lineNoCov">          0 :     return `# Windows PowerShell (5.1) shell notes</span></a>
+<a name="55"><span class="lineNum">      55 </span><span class="lineNoCov">          0 : - Use \`cmd1; if ($?) { cmd2 }\` to chain dependent commands.</span></a>
+<a name="56"><span class="lineNum">      56 </span><span class="lineNoCov">          0 : - Use double quotes for interpolated strings (\`&quot;Hello $name&quot;\`), single quotes for verbatim strings.</span></a>
+<a name="57"><span class="lineNum">      57 </span><span class="lineNoCov">          0 : - Prefer full cmdlet names like \`Get-ChildItem\`, \`Set-Content\`, \`Remove-Item\`, and \`New-Item\` over aliases.</span></a>
+<a name="58"><span class="lineNum">      58 </span><span class="lineNoCov">          0 : - Use \`$(...)\` for subexpressions. Use \`@(...)\` for array expressions.</span></a>
+<a name="59"><span class="lineNum">      59 </span><span class="lineNoCov">          0 : - To call a native executable whose path contains spaces, use the call operator: \`&amp; &quot;path/to/exe&quot; args\`.</span></a>
+<a name="60"><span class="lineNum">      60 </span><span class="lineNoCov">          0 : - Escape special characters with the PowerShell backtick character.`</span></a>
+<a name="61"><span class="lineNum">      61 </span><span class="lineNoCov">          0 :   }</span></a>
+<a name="62"><span class="lineNum">      62 </span>            :   return &quot;&quot;</a>
+<a name="63"><span class="lineNum">      63 </span>            : }</a>
+<a name="64"><span class="lineNum">      64 </span>            : </a>
+<a name="65"><span class="lineNum">      65 </span><span class="lineCov">         10 : function chainGuidance(name: string) {</span></a>
+<a name="66"><span class="lineNum">      66 </span><span class="lineCov">         26 :   if (name === &quot;powershell&quot;) {</span></a>
+<a name="67"><span class="lineNum">      67 </span><span class="lineNoCov">          0 :     return &quot;If the commands depend on each other and must run sequentially, avoid '&amp;&amp;' in this shell because Windows PowerShell (5.1) does not support it. Use PowerShell conditionals such as `cmd1; if ($?) { cmd2 }` when later commands must depend on earlier success.&quot;</span></a>
+<a name="68"><span class="lineNum">      68 </span><span class="lineCov">          2 :   }</span></a>
+<a name="69"><span class="lineNum">      69 </span><span class="lineCov">         17 :   if (PS.has(name)) {</span></a>
+<a name="70"><span class="lineNum">      70 </span><span class="lineNoCov">          0 :     return &quot;If the commands depend on each other and must run sequentially, use a single bash tool call with '&amp;&amp;' to chain them together (e.g., `git add . &amp;&amp; git commit -m \&quot;message\&quot; &amp;&amp; git push`). For instance, if one operation must complete before another starts (like New-Item before Copy-Item, Write before bash for git operations, or git add before git commit), run these operations sequentially instead.&quot;</span></a>
+<a name="71"><span class="lineNum">      71 </span><span class="lineCov">          2 :   }</span></a>
+<a name="72"><span class="lineNum">      72 </span><span class="lineCov">         18 :   if (CMD.has(name)) {</span></a>
+<a name="73"><span class="lineNum">      73 </span><span class="lineNoCov">          0 :     return &quot;If the commands depend on each other and must run sequentially, use a single bash tool call with `&amp;&amp;` to chain them together (e.g., `mkdir out &amp;&amp; dir out`). For instance, if one operation must complete before another starts, run these operations sequentially instead.&quot;</span></a>
+<a name="74"><span class="lineNum">      74 </span><span class="lineCov">          2 :   }</span></a>
+<a name="75"><span class="lineNum">      75 </span><span class="lineCov">        392 :   return &quot;If the commands depend on each other and must run sequentially, use a single Bash call with '&amp;&amp;' to chain them together (e.g., `git add . &amp;&amp; git commit -m \&quot;message\&quot; &amp;&amp; git push`). For instance, if one operation must complete before another starts (like mkdir before cp, Write before Bash for git operations, or git add before git commit), run these operations sequentially instead.&quot;</span></a>
+<a name="76"><span class="lineNum">      76 </span>            : }</a>
+<a name="77"><span class="lineNum">      77 </span>            : </a>
+<a name="78"><span class="lineNum">      78 </span><span class="lineCov">         37 : function bashCommandSection(chain: string, limits: Limits, defaultTimeoutMs: number) {</span></a>
+<a name="79"><span class="lineNum">      79 </span><span class="lineCov">       1001 :   return `Before executing the command, please follow these steps:</span></a>
+<a name="80"><span class="lineNum">      80 </span>            : </a>
+<a name="81"><span class="lineNum">      81 </span>            : 1. Directory Verification:</a>
+<a name="82"><span class="lineNum">      82 </span>            :    - If the command will create new directories or files, first use \`ls\` to verify the parent directory exists and is the correct location</a>
+<a name="83"><span class="lineNum">      83 </span>            :    - For example, before running &quot;mkdir foo/bar&quot;, first use \`ls foo\` to check that &quot;foo&quot; exists and is the intended parent directory</a>
+<a name="84"><span class="lineNum">      84 </span>            : </a>
+<a name="85"><span class="lineNum">      85 </span>            : 2. Command Execution:</a>
+<a name="86"><span class="lineNum">      86 </span>            :    - Always quote file paths that contain spaces with double quotes (e.g., rm &quot;path with spaces/file.txt&quot;)</a>
+<a name="87"><span class="lineNum">      87 </span>            :    - Examples of proper quoting:</a>
+<a name="88"><span class="lineNum">      88 </span>            :      - mkdir &quot;/Users/name/My Documents&quot; (correct)</a>
+<a name="89"><span class="lineNum">      89 </span>            :      - mkdir /Users/name/My Documents (incorrect - will fail)</a>
+<a name="90"><span class="lineNum">      90 </span>            :      - python &quot;/path/with spaces/script.py&quot; (correct)</a>
+<a name="91"><span class="lineNum">      91 </span>            :      - python /path/with spaces/script.py (incorrect - will fail)</a>
+<a name="92"><span class="lineNum">      92 </span>            :    - After ensuring proper quoting, execute the command.</a>
+<a name="93"><span class="lineNum">      93 </span>            :    - Capture the output of the command.</a>
+<a name="94"><span class="lineNum">      94 </span>            : </a>
+<a name="95"><span class="lineNum">      95 </span>            : Usage notes:</a>
+<a name="96"><span class="lineNum">      96 </span>            :   - The command argument is required.</a>
+<a name="97"><span class="lineNum">      97 </span><span class="lineCov">         48 :   - You can specify an optional timeout in milliseconds. If not specified, commands will time out after ${defaultTimeoutMs}ms.</span></a>
+<a name="98"><span class="lineNum">      98 </span><span class="lineCov">       1209 :   - If the output exceeds ${limits.maxLines} lines or ${limits.maxBytes} bytes, it will be truncated and the full output will be written to a file. You can use Read with offset/limit to read specific sections or Grep to search the full content. Do NOT use \`head\`, \`tail\`, or other truncation commands to limit output; the full output will already be captured to a file for more precise searching.</span></a>
+<a name="99"><span class="lineNum">      99 </span>            : </a>
+<a name="100"><span class="lineNum">     100 </span>            :   - Avoid using Bash with the \`find\`, \`grep\`, \`cat\`, \`head\`, \`tail\`, \`sed\`, \`awk\`, or \`echo\` commands, unless explicitly instructed or when these commands are truly necessary for the task. Instead, always prefer using the dedicated tools for these commands:</a>
+<a name="101"><span class="lineNum">     101 </span>            :     - File search: Use Glob (NOT find or ls)</a>
+<a name="102"><span class="lineNum">     102 </span>            :     - Content search: Use Grep (NOT grep or rg)</a>
+<a name="103"><span class="lineNum">     103 </span>            :     - Read files: Use Read (NOT cat/head/tail)</a>
+<a name="104"><span class="lineNum">     104 </span>            :     - Edit files: Use Edit (NOT sed/awk)</a>
+<a name="105"><span class="lineNum">     105 </span>            :     - Write files: Use Write (NOT echo &gt;/cat &lt;&lt;EOF)</a>
+<a name="106"><span class="lineNum">     106 </span>            :     - Communication: Output text directly (NOT echo/printf)</a>
+<a name="107"><span class="lineNum">     107 </span>            :   - When issuing multiple commands:</a>
+<a name="108"><span class="lineNum">     108 </span>            :     - If the commands are independent and can run in parallel, make multiple bash tool calls in a single message. For example, if you need to run &quot;git status&quot; and &quot;git diff&quot;, send a single message with two bash tool calls in parallel.</a>
+<a name="109"><span class="lineNum">     109 </span><span class="lineCov">        455 :     - ${chain}</span></a>
+<a name="110"><span class="lineNum">     110 </span>            :     - Use ';' only when you need to run commands sequentially but don't care if earlier commands fail</a>
+<a name="111"><span class="lineNum">     111 </span>            :     - DO NOT use newlines to separate commands (newlines are ok in quoted strings)</a>
+<a name="112"><span class="lineNum">     112 </span>            :   - AVOID using \`cd &lt;directory&gt; &amp;&amp; &lt;command&gt;\`. Use the \`workdir\` parameter to change directories instead.</a>
+<a name="113"><span class="lineNum">     113 </span>            :     &lt;good-example&gt;</a>
+<a name="114"><span class="lineNum">     114 </span>            :     Use workdir=&quot;/foo/bar&quot; with command: pytest tests</a>
+<a name="115"><span class="lineNum">     115 </span>            :     &lt;/good-example&gt;</a>
+<a name="116"><span class="lineNum">     116 </span>            :     &lt;bad-example&gt;</a>
+<a name="117"><span class="lineNum">     117 </span>            :     cd /foo/bar &amp;&amp; pytest tests</a>
+<a name="118"><span class="lineNum">     118 </span>            :     &lt;/bad-example&gt;`</a>
+<a name="119"><span class="lineNum">     119 </span>            : }</a>
+<a name="120"><span class="lineNum">     120 </span>            : </a>
+<a name="121"><span class="lineNum">     121 </span><span class="lineNoCov">          0 : function powershellCommandSection(</span></a>
+<a name="122"><span class="lineNum">     122 </span><span class="lineNoCov">          0 :   name: string,</span></a>
+<a name="123"><span class="lineNum">     123 </span><span class="lineNoCov">          0 :   chain: string,</span></a>
+<a name="124"><span class="lineNum">     124 </span><span class="lineNoCov">          0 :   pathSep: string,</span></a>
+<a name="125"><span class="lineNum">     125 </span><span class="lineNoCov">          0 :   limits: Limits,</span></a>
+<a name="126"><span class="lineNum">     126 </span><span class="lineNoCov">          0 :   defaultTimeoutMs: number,</span></a>
+<a name="127"><span class="lineNum">     127 </span><span class="lineNoCov">          0 : ) {</span></a>
+<a name="128"><span class="lineNum">     128 </span><span class="lineNoCov">          0 :   return `${powershellNotes(name)}</span></a>
+<a name="129"><span class="lineNum">     129 </span><span class="lineNoCov">          0 : </span></a>
+<a name="130"><span class="lineNum">     130 </span><span class="lineNoCov">          0 : Before executing the command, please follow these steps:</span></a>
+<a name="131"><span class="lineNum">     131 </span><span class="lineNoCov">          0 : </span></a>
+<a name="132"><span class="lineNum">     132 </span><span class="lineNoCov">          0 : 1. Directory Verification:</span></a>
+<a name="133"><span class="lineNum">     133 </span><span class="lineNoCov">          0 :    - If the command will create new directories or files, first use \`Test-Path -LiteralPath &lt;parent&gt;\` to verify the parent directory exists and is the correct location</span></a>
+<a name="134"><span class="lineNum">     134 </span><span class="lineNoCov">          0 :    - For example, before creating \`foo${pathSep}bar\`, first use \`Test-Path -LiteralPath &quot;foo&quot;\` to check that \`foo\` exists and is the intended parent directory</span></a>
+<a name="135"><span class="lineNum">     135 </span><span class="lineNoCov">          0 : </span></a>
+<a name="136"><span class="lineNum">     136 </span><span class="lineNoCov">          0 : 2. Command Execution:</span></a>
+<a name="137"><span class="lineNum">     137 </span><span class="lineNoCov">          0 :    - Always quote file paths that contain spaces with double quotes (e.g., Remove-Item -LiteralPath &quot;path with spaces${pathSep}file.txt&quot;)</span></a>
+<a name="138"><span class="lineNum">     138 </span><span class="lineNoCov">          0 :    - Examples of proper quoting:</span></a>
+<a name="139"><span class="lineNum">     139 </span><span class="lineNoCov">          0 :      - New-Item -ItemType Directory -Path &quot;My Documents&quot; (correct)</span></a>
+<a name="140"><span class="lineNum">     140 </span><span class="lineNoCov">          0 :      - New-Item -ItemType Directory -Path My Documents (incorrect - path is split)</span></a>
+<a name="141"><span class="lineNum">     141 </span><span class="lineNoCov">          0 :      - &amp; &quot;path with spaces${pathSep}script.ps1&quot; (correct)</span></a>
+<a name="142"><span class="lineNum">     142 </span><span class="lineNoCov">          0 :      - path with spaces${pathSep}script.ps1 (incorrect - path is split and not invoked)</span></a>
+<a name="143"><span class="lineNum">     143 </span><span class="lineNoCov">          0 :    - After ensuring proper quoting, execute the command.</span></a>
+<a name="144"><span class="lineNum">     144 </span><span class="lineNoCov">          0 :    - Capture the output of the command.</span></a>
+<a name="145"><span class="lineNum">     145 </span><span class="lineNoCov">          0 : </span></a>
+<a name="146"><span class="lineNum">     146 </span><span class="lineNoCov">          0 : Usage notes:</span></a>
+<a name="147"><span class="lineNum">     147 </span><span class="lineNoCov">          0 :   - The command argument is required.</span></a>
+<a name="148"><span class="lineNum">     148 </span><span class="lineNoCov">          0 :   - You can specify an optional timeout in milliseconds. If not specified, commands will time out after ${defaultTimeoutMs}ms.</span></a>
+<a name="149"><span class="lineNum">     149 </span><span class="lineNoCov">          0 :   - If the output exceeds ${limits.maxLines} lines or ${limits.maxBytes} bytes, it will be truncated and the full output will be written to a file. You can use Read with offset/limit to read specific sections or Grep to search the full content. Do NOT use \`Select-Object -First\`, \`Select-Object -Last\`, or other truncation commands to limit output; the full output will already be captured to a file for more precise searching.</span></a>
+<a name="150"><span class="lineNum">     150 </span><span class="lineNoCov">          0 : </span></a>
+<a name="151"><span class="lineNum">     151 </span><span class="lineNoCov">          0 :   - Avoid using Shell with PowerShell file/content cmdlets unless explicitly instructed or when these cmdlets are truly necessary for the task. Instead, always prefer using the dedicated tools for these commands:</span></a>
+<a name="152"><span class="lineNum">     152 </span><span class="lineNoCov">          0 :     - File search: Use Glob (NOT Get-ChildItem)</span></a>
+<a name="153"><span class="lineNum">     153 </span><span class="lineNoCov">          0 :     - Content search: Use Grep (NOT Select-String)</span></a>
+<a name="154"><span class="lineNum">     154 </span><span class="lineNoCov">          0 :     - Read files: Use Read (NOT Get-Content)</span></a>
+<a name="155"><span class="lineNum">     155 </span><span class="lineNoCov">          0 :     - Edit files: Use Edit (NOT Set-Content)</span></a>
+<a name="156"><span class="lineNum">     156 </span><span class="lineNoCov">          0 :     - Write files: Use Write (NOT Set-Content/Out-File or here-strings)</span></a>
+<a name="157"><span class="lineNum">     157 </span><span class="lineNoCov">          0 :     - Communication: Output text directly (NOT Write-Output/Write-Host)</span></a>
+<a name="158"><span class="lineNum">     158 </span><span class="lineNoCov">          0 :   - When issuing multiple commands:</span></a>
+<a name="159"><span class="lineNum">     159 </span><span class="lineNoCov">          0 :     - If the commands are independent and can run in parallel, make multiple bash tool calls in a single message. For example, if you need to run &quot;git status&quot; and &quot;git diff&quot;, send a single message with two bash tool calls in parallel.</span></a>
+<a name="160"><span class="lineNum">     160 </span><span class="lineNoCov">          0 :     - ${chain}</span></a>
+<a name="161"><span class="lineNum">     161 </span><span class="lineNoCov">          0 :     - Use \`;\` only when you need to run commands sequentially but don't care if earlier commands fail</span></a>
+<a name="162"><span class="lineNum">     162 </span><span class="lineNoCov">          0 :     - DO NOT use newlines to separate commands (newlines are ok in quoted strings)</span></a>
+<a name="163"><span class="lineNum">     163 </span><span class="lineNoCov">          0 :   - AVOID changing directories inside the command. Use the \`workdir\` parameter to change directories instead.</span></a>
+<a name="164"><span class="lineNum">     164 </span><span class="lineNoCov">          0 :     &lt;good-example&gt;</span></a>
+<a name="165"><span class="lineNum">     165 </span><span class="lineNoCov">          0 :     Use workdir=&quot;project${pathSep}subdir&quot; with command: pytest tests</span></a>
+<a name="166"><span class="lineNum">     166 </span><span class="lineNoCov">          0 :     &lt;/good-example&gt;</span></a>
+<a name="167"><span class="lineNum">     167 </span><span class="lineNoCov">          0 :     &lt;bad-example&gt;</span></a>
+<a name="168"><span class="lineNum">     168 </span>            :     ${name === &quot;powershell&quot; ? `Set-Location -LiteralPath &quot;project${pathSep}subdir&quot;; if ($?) { pytest tests }` : `Set-Location -LiteralPath &quot;project${pathSep}subdir&quot; &amp;&amp; pytest tests`}</a>
+<a name="169"><span class="lineNum">     169 </span>            :     &lt;/bad-example&gt;`</a>
+<a name="170"><span class="lineNum">     170 </span>            : }</a>
+<a name="171"><span class="lineNum">     171 </span>            : </a>
+<a name="172"><span class="lineNum">     172 </span><span class="lineNoCov">          0 : function cmdCommandSection(chain: string, limits: Limits, defaultTimeoutMs: number) {</span></a>
+<a name="173"><span class="lineNum">     173 </span><span class="lineNoCov">          0 :   return `# cmd.exe shell notes</span></a>
+<a name="174"><span class="lineNum">     174 </span><span class="lineNoCov">          0 : - Use double quotes for paths with spaces.</span></a>
+<a name="175"><span class="lineNum">     175 </span><span class="lineNoCov">          0 : - Use %VAR% for environment variables.</span></a>
+<a name="176"><span class="lineNum">     176 </span><span class="lineNoCov">          0 : - Use \`if exist\` for existence checks.</span></a>
+<a name="177"><span class="lineNum">     177 </span><span class="lineNoCov">          0 : - Use \`call\` when invoking batch files from another batch-style command.</span></a>
+<a name="178"><span class="lineNum">     178 </span><span class="lineNoCov">          0 : </span></a>
+<a name="179"><span class="lineNum">     179 </span><span class="lineNoCov">          0 : Before executing the command, please follow these steps:</span></a>
+<a name="180"><span class="lineNum">     180 </span><span class="lineNoCov">          0 : </span></a>
+<a name="181"><span class="lineNum">     181 </span><span class="lineNoCov">          0 : 1. Directory Verification:</span></a>
+<a name="182"><span class="lineNum">     182 </span><span class="lineNoCov">          0 :    - If the command will create new directories or files, first use \`if exist\` to verify the parent directory exists and is the correct location</span></a>
+<a name="183"><span class="lineNum">     183 </span><span class="lineNoCov">          0 :    - For example, before creating \`foo\\bar\`, first use \`if exist &quot;foo\\&quot; dir &quot;foo&quot;\` to check that \`foo\` exists and is the intended parent directory</span></a>
+<a name="184"><span class="lineNum">     184 </span><span class="lineNoCov">          0 : </span></a>
+<a name="185"><span class="lineNum">     185 </span><span class="lineNoCov">          0 : 2. Command Execution:</span></a>
+<a name="186"><span class="lineNum">     186 </span><span class="lineNoCov">          0 :    - Always quote file paths that contain spaces with double quotes (e.g., del &quot;path with spaces\\file.txt&quot;)</span></a>
+<a name="187"><span class="lineNum">     187 </span><span class="lineNoCov">          0 :    - Examples of proper quoting:</span></a>
+<a name="188"><span class="lineNum">     188 </span><span class="lineNoCov">          0 :      - mkdir &quot;My Documents&quot; (correct)</span></a>
+<a name="189"><span class="lineNum">     189 </span><span class="lineNoCov">          0 :      - mkdir My Documents (incorrect - path is split)</span></a>
+<a name="190"><span class="lineNum">     190 </span><span class="lineNoCov">          0 :      - call &quot;path with spaces\\script.bat&quot; (correct)</span></a>
+<a name="191"><span class="lineNum">     191 </span><span class="lineNoCov">          0 :      - path with spaces\\script.bat (incorrect - path is split and not invoked correctly)</span></a>
+<a name="192"><span class="lineNum">     192 </span><span class="lineNoCov">          0 :    - After ensuring proper quoting, execute the command.</span></a>
+<a name="193"><span class="lineNum">     193 </span><span class="lineNoCov">          0 :    - Capture the output of the command.</span></a>
+<a name="194"><span class="lineNum">     194 </span><span class="lineNoCov">          0 : </span></a>
+<a name="195"><span class="lineNum">     195 </span><span class="lineNoCov">          0 : Usage notes:</span></a>
+<a name="196"><span class="lineNum">     196 </span><span class="lineNoCov">          0 :   - The command argument is required.</span></a>
+<a name="197"><span class="lineNum">     197 </span><span class="lineNoCov">          0 :   - You can specify an optional timeout in milliseconds. If not specified, commands will time out after ${defaultTimeoutMs}ms.</span></a>
+<a name="198"><span class="lineNum">     198 </span><span class="lineNoCov">          0 :   - If the output exceeds ${limits.maxLines} lines or ${limits.maxBytes} bytes, it will be truncated and the full output will be written to a file. You can use Read with offset/limit to read specific sections or Grep to search the full content. Do NOT use \`more\` or other pagination commands to limit output; the full output will already be captured to a file for more precise searching.</span></a>
+<a name="199"><span class="lineNum">     199 </span><span class="lineNoCov">          0 : </span></a>
+<a name="200"><span class="lineNum">     200 </span><span class="lineNoCov">          0 :   - Avoid using Shell with cmd.exe file/content commands unless explicitly instructed or when these commands are truly necessary for the task. Instead, always prefer using the dedicated tools for these commands:</span></a>
+<a name="201"><span class="lineNum">     201 </span><span class="lineNoCov">          0 :     - File search: Use Glob (NOT dir /s)</span></a>
+<a name="202"><span class="lineNum">     202 </span><span class="lineNoCov">          0 :     - Content search: Use Grep (NOT findstr)</span></a>
+<a name="203"><span class="lineNum">     203 </span><span class="lineNoCov">          0 :     - Read files: Use Read (NOT type)</span></a>
+<a name="204"><span class="lineNum">     204 </span><span class="lineNoCov">          0 :     - Edit files: Use Edit (NOT copy)</span></a>
+<a name="205"><span class="lineNum">     205 </span><span class="lineNoCov">          0 :     - Write files: Use Write (NOT echo &gt; file)</span></a>
+<a name="206"><span class="lineNum">     206 </span><span class="lineNoCov">          0 :     - Communication: Output text directly (NOT echo)</span></a>
+<a name="207"><span class="lineNum">     207 </span><span class="lineNoCov">          0 :   - When issuing multiple commands:</span></a>
+<a name="208"><span class="lineNum">     208 </span><span class="lineNoCov">          0 :     - If the commands are independent and can run in parallel, make multiple bash tool calls in a single message. For example, if you need to run &quot;dir&quot; and &quot;where cmd&quot;, send a single message with two bash tool calls in parallel.</span></a>
+<a name="209"><span class="lineNum">     209 </span>            :     - ${chain}</a>
+<a name="210"><span class="lineNum">     210 </span>            :     - Use \`&amp;\` only when you need to run commands sequentially but don't care if earlier commands fail</a>
+<a name="211"><span class="lineNum">     211 </span>            :     - DO NOT use newlines to separate commands (newlines are ok in quoted strings)</a>
+<a name="212"><span class="lineNum">     212 </span>            :   - AVOID changing directories inside the command. Use the \`workdir\` parameter to change directories instead.</a>
+<a name="213"><span class="lineNum">     213 </span>            :     &lt;good-example&gt;</a>
+<a name="214"><span class="lineNum">     214 </span>            :     Use workdir=&quot;project\\subdir&quot; with command: dir</a>
+<a name="215"><span class="lineNum">     215 </span>            :     &lt;/good-example&gt;</a>
+<a name="216"><span class="lineNum">     216 </span>            :     &lt;bad-example&gt;</a>
+<a name="217"><span class="lineNum">     217 </span>            :     cd /d &quot;project\\subdir&quot; &amp;&amp; dir</a>
+<a name="218"><span class="lineNum">     218 </span>            :     &lt;/bad-example&gt;`</a>
+<a name="219"><span class="lineNum">     219 </span>            : }</a>
+<a name="220"><span class="lineNum">     220 </span>            : </a>
+<a name="221"><span class="lineNum">     221 </span><span class="lineCov">         46 : function profile(name: string, platform: NodeJS.Platform, limits: Limits, defaultTimeoutMs: number) {</span></a>
+<a name="222"><span class="lineNum">     222 </span><span class="lineCov">         36 :   const isPowerShell = PS.has(name)</span></a>
+<a name="223"><span class="lineNum">     223 </span><span class="lineCov">         36 :   const chain = chainGuidance(name)</span></a>
+<a name="224"><span class="lineNum">     224 </span><span class="lineCov">         18 :   if (CMD.has(name)) {</span></a>
+<a name="225"><span class="lineNum">     225 </span><span class="lineNoCov">          0 :     return {</span></a>
+<a name="226"><span class="lineNum">     226 </span><span class="lineNoCov">          0 :       intro: `Executes a given ${shellDisplayName(name)} command with optional timeout, ensuring proper handling and security measures.`,</span></a>
+<a name="227"><span class="lineNum">     227 </span><span class="lineNoCov">          0 :       workdirSection:</span></a>
+<a name="228"><span class="lineNum">     228 </span><span class="lineNoCov">          0 :         &quot;All commands run in the current working directory by default. Use the `workdir` parameter if you need to run a command in a different directory. AVOID changing directories inside the command - use `workdir` instead.&quot;,</span></a>
+<a name="229"><span class="lineNum">     229 </span><span class="lineNoCov">          0 :       commandSection: cmdCommandSection(chain, limits, defaultTimeoutMs),</span></a>
+<a name="230"><span class="lineNum">     230 </span><span class="lineNoCov">          0 :       gitCommands: &quot;git commands&quot;,</span></a>
+<a name="231"><span class="lineNum">     231 </span><span class="lineNoCov">          0 :       gitCommandRestriction: &quot;git commands&quot;,</span></a>
+<a name="232"><span class="lineNum">     232 </span><span class="lineNoCov">          0 :       createPrInstruction: &quot;Create PR using a temporary body file so cmd.exe quoting stays simple.&quot;,</span></a>
+<a name="233"><span class="lineNum">     233 </span><span class="lineNoCov">          0 :       createPrExample: `(\n  echo ## Summary\n  echo - ^&lt;1-3 bullet points^&gt;\n) &gt; pr-body.txt\ngh pr create --title &quot;the pr title&quot; --body-file pr-body.txt`,</span></a>
+<a name="234"><span class="lineNum">     234 </span><span class="lineNoCov">          0 :     }</span></a>
+<a name="235"><span class="lineNum">     235 </span><span class="lineCov">          2 :   }</span></a>
+<a name="236"><span class="lineNum">     236 </span><span class="lineCov">         17 :   if (isPowerShell) {</span></a>
+<a name="237"><span class="lineNum">     237 </span><span class="lineNoCov">          0 :     return {</span></a>
+<a name="238"><span class="lineNum">     238 </span><span class="lineNoCov">          0 :       intro: `Executes a given ${shellDisplayName(name)} command with optional timeout, ensuring proper handling and security measures.`,</span></a>
+<a name="239"><span class="lineNum">     239 </span><span class="lineNoCov">          0 :       workdirSection:</span></a>
+<a name="240"><span class="lineNum">     240 </span><span class="lineNoCov">          0 :         &quot;All commands run in the current working directory by default. Use the `workdir` parameter if you need to run a command in a different directory. AVOID changing directories inside the command - use `workdir` instead.&quot;,</span></a>
+<a name="241"><span class="lineNum">     241 </span><span class="lineNoCov">          0 :       commandSection: powershellCommandSection(</span></a>
+<a name="242"><span class="lineNum">     242 </span><span class="lineNoCov">          0 :         name,</span></a>
+<a name="243"><span class="lineNum">     243 </span><span class="lineNoCov">          0 :         chain,</span></a>
+<a name="244"><span class="lineNum">     244 </span><span class="lineNoCov">          0 :         platform === &quot;win32&quot; ? &quot;\\&quot; : &quot;/&quot;,</span></a>
+<a name="245"><span class="lineNum">     245 </span><span class="lineNoCov">          0 :         limits,</span></a>
+<a name="246"><span class="lineNum">     246 </span><span class="lineNoCov">          0 :         defaultTimeoutMs,</span></a>
+<a name="247"><span class="lineNum">     247 </span><span class="lineNoCov">          0 :       ),</span></a>
+<a name="248"><span class="lineNum">     248 </span><span class="lineNoCov">          0 :       gitCommands: &quot;git commands&quot;,</span></a>
+<a name="249"><span class="lineNum">     249 </span><span class="lineNoCov">          0 :       gitCommandRestriction: &quot;git commands&quot;,</span></a>
+<a name="250"><span class="lineNum">     250 </span><span class="lineNoCov">          0 :       createPrInstruction: &quot;Create PR using gh pr create with a PowerShell here-string to pass the body correctly.&quot;,</span></a>
+<a name="251"><span class="lineNum">     251 </span><span class="lineNoCov">          0 :       createPrExample: `gh pr create --title &quot;the pr title&quot; --body @'</span></a>
+<a name="252"><span class="lineNum">     252 </span>            : ## Summary</a>
+<a name="253"><span class="lineNum">     253 </span>            : - &lt;1-3 bullet points&gt;</a>
+<a name="254"><span class="lineNum">     254 </span>            : '@`,</a>
+<a name="255"><span class="lineNum">     255 </span><span class="lineNoCov">          0 :     }</span></a>
+<a name="256"><span class="lineNum">     256 </span><span class="lineCov">          2 :   }</span></a>
+<a name="257"><span class="lineNum">     257 </span><span class="lineCov">         12 :   return {</span></a>
+<a name="258"><span class="lineNum">     258 </span><span class="lineCov">          7 :     intro:</span></a>
+<a name="259"><span class="lineNum">     259 </span><span class="lineCov">        137 :       &quot;Executes a given bash command in a persistent shell session with optional timeout, ensuring proper handling and security measures.&quot;,</span></a>
+<a name="260"><span class="lineNum">     260 </span><span class="lineCov">         16 :     workdirSection:</span></a>
+<a name="261"><span class="lineNum">     261 </span><span class="lineCov">        227 :       &quot;All commands run in the current working directory by default. Use the `workdir` parameter if you need to run a command in a different directory. AVOID using `cd &lt;directory&gt; &amp;&amp; &lt;command&gt;` patterns - use `workdir` instead.&quot;,</span></a>
+<a name="262"><span class="lineNum">     262 </span><span class="lineCov">         72 :     commandSection: bashCommandSection(chain, limits, defaultTimeoutMs),</span></a>
+<a name="263"><span class="lineNum">     263 </span><span class="lineCov">         33 :     gitCommands: &quot;bash commands&quot;,</span></a>
+<a name="264"><span class="lineNum">     264 </span><span class="lineCov">         47 :     gitCommandRestriction: &quot;git bash commands&quot;,</span></a>
+<a name="265"><span class="lineNum">     265 </span><span class="lineCov">         21 :     createPrInstruction:</span></a>
+<a name="266"><span class="lineNum">     266 </span><span class="lineCov">        119 :       &quot;Create PR using gh pr create with the format below. Use a HEREDOC to pass the body to ensure correct formatting.&quot;,</span></a>
+<a name="267"><span class="lineNum">     267 </span><span class="lineCov">        107 :     createPrExample: `gh pr create --title &quot;the pr title&quot; --body &quot;$(cat &lt;&lt;'EOF'</span></a>
+<a name="268"><span class="lineNum">     268 </span>            : ## Summary</a>
+<a name="269"><span class="lineNum">     269 </span>            : &lt;1-3 bullet points&gt;`,</a>
+<a name="270"><span class="lineNum">     270 </span><span class="lineCov">          2 :   }</span></a>
+<a name="271"><span class="lineNum">     271 </span>            : }</a>
+<a name="272"><span class="lineNum">     272 </span>            : </a>
+<a name="273"><span class="lineNum">     273 </span><span class="lineCov">         51 : export function render(name: string, platform: NodeJS.Platform, limits: Limits, defaultTimeoutMs: number) {</span></a>
+<a name="274"><span class="lineNum">     274 </span><span class="lineCov">         69 :   const selected = profile(name, platform, limits, defaultTimeoutMs)</span></a>
+<a name="275"><span class="lineNum">     275 </span><span class="lineCov">         12 :   return {</span></a>
+<a name="276"><span class="lineNum">     276 </span><span class="lineCov">         46 :     description: renderPrompt(DESCRIPTION, {</span></a>
+<a name="277"><span class="lineNum">     277 </span><span class="lineCov">         28 :       intro: selected.intro,</span></a>
+<a name="278"><span class="lineNum">     278 </span><span class="lineCov">         19 :       os: platform,</span></a>
+<a name="279"><span class="lineNum">     279 </span><span class="lineCov">         18 :       shell: name,</span></a>
+<a name="280"><span class="lineNum">     280 </span><span class="lineCov">         27 :       tmp: Global.Path.tmp,</span></a>
+<a name="281"><span class="lineNum">     281 </span><span class="lineCov">         46 :       workdirSection: selected.workdirSection,</span></a>
+<a name="282"><span class="lineNum">     282 </span><span class="lineCov">         46 :       commandSection: selected.commandSection,</span></a>
+<a name="283"><span class="lineNum">     283 </span><span class="lineCov">         40 :       gitCommands: selected.gitCommands,</span></a>
+<a name="284"><span class="lineNum">     284 </span><span class="lineCov">         31 :       toolName: ShellID.ToolID,</span></a>
+<a name="285"><span class="lineNum">     285 </span><span class="lineCov">         60 :       gitCommandRestriction: selected.gitCommandRestriction,</span></a>
+<a name="286"><span class="lineNum">     286 </span><span class="lineCov">         56 :       createPrInstruction: selected.createPrInstruction,</span></a>
+<a name="287"><span class="lineNum">     287 </span><span class="lineCov">         45 :       createPrExample: selected.createPrExample,</span></a>
+<a name="288"><span class="lineNum">     288 </span><span class="lineCov">          7 :     }),</span></a>
+<a name="289"><span class="lineNum">     289 </span><span class="lineCov">         31 :     parameters: parameterSchema(),</span></a>
+<a name="290"><span class="lineNum">     290 </span><span class="lineCov">          2 :   }</span></a>
+<a name="291"><span class="lineNum">     291 </span>            : }</a>
+<a name="292"><span class="lineNum">     292 </span>            : </a>
+<a name="293"><span class="lineNum">     293 </span><span class="lineCov">         39 : export * as ShellPrompt from &quot;./prompt&quot;</span></a>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="https://github.com/linux-test-project/lcov" target="_parent">LCOV version 1.16</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>
