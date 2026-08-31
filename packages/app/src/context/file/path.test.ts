@@ -50,10 +50,61 @@ describe("file path helpers", () => {
     expect(stripQueryAndHash("a/b.ts")).toBe("a/b.ts")
   })
 
+  test("unquotes all named escape sequences", () => {
+    expect(unquoteGitPath('"new\\nline"')).toBe("new\nline")
+    expect(unquoteGitPath('"tab\\tend"')).toBe("tab\tend")
+    expect(unquoteGitPath('"cr\\rend"')).toBe("cr\rend")
+    expect(unquoteGitPath('"backspace\\bend"')).toBe("backspace\bend")
+    expect(unquoteGitPath('"formfeed\\fend"')).toBe("formfeed\fend")
+    expect(unquoteGitPath('"vtab\\vend"')).toBe("vtab\vend")
+    expect(unquoteGitPath('"back\\\\slash"')).toBe("back\\slash")
+    expect(unquoteGitPath('"quo\\"te"')).toBe('quo"te')
+  })
+
+  test("returns input unchanged when not fully wrapped in quotes", () => {
+    expect(unquoteGitPath('"unterminated')).toBe('"unterminated')
+    expect(unquoteGitPath('unwrapped"')).toBe('unwrapped"')
+    expect(unquoteGitPath("a/b/c.ts")).toBe("a/b/c.ts")
+  })
+
+  test("preserves a trailing lone backslash", () => {
+    expect(unquoteGitPath('"trailing\\"')).toBe("trailing\\")
+  })
+
   test("unquotes git escaped octal path strings", () => {
     expect(unquoteGitPath('"a/\\303\\251.txt"')).toBe("a/\u00e9.txt")
-    expect(unquoteGitPath('"plain\\nname"')).toBe("plain\nname")
-    expect(unquoteGitPath("a/b/c.ts")).toBe("a/b/c.ts")
+  })
+
+  test("unquotes single and double digit octal escapes", () => {
+    expect(unquoteGitPath('"\\7"')).toBe("\u0007")
+    expect(unquoteGitPath('"\\41"')).toBe("!")
+  })
+
+  test("unquotes multiple octal escapes in one string", () => {
+    expect(unquoteGitPath('"\\303\\251\\303\\251.txt"')).toBe("\u00e9\u00e9.txt")
+  })
+
+  test("stops octal match at a non-octal digit", () => {
+    // "8" is not a valid octal digit, so \18 should decode \1 as octal
+    // and then treat "8" as a separate literal character
+    expect(unquoteGitPath('"\\18"')).toBe("\u00018")
+  })
+
+  test("returns the literal character for unrecognized escape sequences", () => {
+    expect(unquoteGitPath('"foo\\xbar"')).toBe("fooxbar")
+  })
+
+  test("returns the literal character for unrecognized escape sequences with digits outside octal range", () => {
+    expect(unquoteGitPath('"foo\\8bar"')).toBe("foo8bar")
+    expect(unquoteGitPath('"foo\\9bar"')).toBe("foo9bar")
+  })
+
+  test("preserves a trailing lone backslash", () => {
+    expect(unquoteGitPath('"trailing\\"')).toBe("trailing\\")
+  })
+
+  test("preserves a trailing lone backslash after other content", () => {
+    expect(unquoteGitPath('"a\\\\b\\"')).toBe("a\\b\\")
   })
 })
 
