@@ -3,6 +3,7 @@ import { createEffect, Match, onCleanup, splitProps, Switch, type JSX } from "so
 import type { ComponentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import "./tooltip-v2.css"
+import { shouldDropBlock } from "./tooltip-v2-utils"
 
 export interface TooltipV2Props extends ComponentProps<typeof KobalteTooltip> {
   value: JSX.Element
@@ -12,6 +13,8 @@ export interface TooltipV2Props extends ComponentProps<typeof KobalteTooltip> {
   inactive?: boolean
   forceOpen?: boolean
 }
+
+
 
 export function TooltipV2(props: TooltipV2Props) {
   let ref: HTMLDivElement | undefined
@@ -40,10 +43,10 @@ export function TooltipV2(props: TooltipV2Props) {
   }
 
   const drop = (expand = state.expand) => {
-    if (expand) return
-    if (ref?.matches(":hover")) return
-    if (inside()) return
-    setState("block", false)
+    const hovered = ref?.matches(":hover") ?? false
+    if (shouldDropBlock(expand, hovered, inside())) {
+      setState("block", false)
+    }
   }
 
   const sync = () => {
