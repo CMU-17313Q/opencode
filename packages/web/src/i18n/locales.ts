@@ -97,21 +97,24 @@ export function exactLocale(input: string) {
 
 export function matchLocale(input: string) {
   const value = parse(input)
-  if (!value) return null
+  let result: Locale | null = null
 
-  if (value.startsWith("zh")) {
-    if (value.includes("hant") || value.includes("-tw") || value.includes("-hk") || value.includes("-mo")) {
-      return "zh-tw"
+  if (value) {
+    if (value.startsWith("zh")) {
+      result =
+        value.includes("hant") || value.includes("-tw") || value.includes("-hk") || value.includes("-mo")
+          ? "zh-tw"
+          : "zh-cn"
+    } else if (value in localeAlias) {
+      result = localeAlias[value as keyof typeof localeAlias]
+    } else if (value.startsWith("pt")) {
+      result = "pt-br"
+    } else if (value.startsWith("no") || value.startsWith("nb") || value.startsWith("nn")) {
+      result = "nb"
+    } else {
+      result = starts.find((item) => value.startsWith(item[0]))?.[1] ?? null
     }
-    return "zh-cn"
   }
 
-  if (value in localeAlias) {
-    return localeAlias[value as keyof typeof localeAlias]
-  }
-
-  if (value.startsWith("pt")) return "pt-br"
-  if (value.startsWith("no") || value.startsWith("nb") || value.startsWith("nn")) return "nb"
-
-  return starts.find((item) => value.startsWith(item[0]))?.[1] ?? null
+  return result
 }
