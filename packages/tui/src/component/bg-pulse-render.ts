@@ -89,7 +89,8 @@ function clamp(n: number) {
   return Math.max(0, Math.min(1, n))
 }
 
-function writeRgb(buffer: Uint16Array, offset: number, r: number, g: number, b: number, a = 255) {
+export function writeRgb(buffer: Uint16Array, offset: number, color: { r: number; g: number; b: number; a?: number }) {
+  const { r, g, b, a = 255 } = color
   buffer[offset] = r
   buffer[offset + 1] = g
   buffer[offset + 2] = b
@@ -113,7 +114,7 @@ function writeLogoTint(
   const r = mixChannel(mixChannel(base[0], primary[0], p), 255, q)
   const g = mixChannel(mixChannel(base[1], primary[1], p), 255, q)
   const b = mixChannel(mixChannel(base[2], primary[2], p), 255, q)
-  writeRgb(buffer, offset, r, g, b)
+  writeRgb(buffer, offset, { r, g, b })
 }
 
 function sameRgb(a: Rgb, b: Rgb) {
