@@ -8,6 +8,7 @@ import {
   UnsupportedLocalRepositoryError,
   isFileRepositoryReference,
   isRemoteRepositoryReference,
+  parseGitHubRemote,
   parseRemoteRepositoryReference,
   parseRepositoryReference,
   repositoryCacheIdentity,
@@ -89,5 +90,38 @@ describe("util.repository", () => {
     expect(() => validateRepositoryBranch("bad..branch")).toThrow("Branch must contain only alphanumeric characters")
     expect(() => validateRepositoryBranch("bad branch")).toThrow("Branch must contain only alphanumeric characters")
     expect(() => validateRepositoryBranch("bad branch")).toThrow(InvalidRepositoryBranchError)
+  })
+
+  test("parses github: prefixed shorthand", () => {
+    const reference = parseRemoteRepositoryReference("github:owner/repo")
+
+    expect(reference).toMatchObject({
+      host: "github.com",
+      owner: "owner",
+      repo: "repo",
+      label: "owner/repo",
+    })
+  })
+
+  test("parses github remote shorthand into owner and repo", () => {
+    expect(parseGitHubRemote("git@github.com:owner/repo.git")).toEqual({ owner: "owner", repo: "repo" })
+    expect(parseGitHubRemote("https://github.com/owner/repo.git")).toEqual({ owner: "owner", repo: "repo" })
+
+    expect(parseGitHubRemote("owner/repo")).toBeNull()
+    expect(parseGitHubRemote("https://gitlab.com/owner/repo.git")).toBeNull()
+    expect(parseGitHubRemote("not a valid remote")).toBeNull()
+  })
+
+  test("uses custom github base url override when set", () => {
+    const original = process.env.OPENCODE_REPO_CLONE_GITHUB_BASE_URL
+    process.env.OPENCODE_REPO_CLONE_GITHUB_BASE_URL = "https://github.internal.example.com"
+
+    try {
+      const reference = parseRemoteRepositoryReference("owner/repo")
+      expect(reference.remote).toBe("https://github.internal.example.com/owner/repo.git")
+    } finally {
+      if (original === undefined) delete process.env.OPENCODE_REPO_CLONE_GITHUB_BASE_URL
+      else process.env.OPENCODE_REPO_CLONE_GITHUB_BASE_URL = original
+    }
   })
 })

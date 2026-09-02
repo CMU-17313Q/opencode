@@ -136,29 +136,38 @@ function buildFileReference(input: { url: URL; remote: string }) {
   } satisfies FileReference
 }
 
-export function parseRepositoryReference(input: string) {
-  const cleaned = normalizeRepositoryInput(input)
-  if (!cleaned) return null
 
+function tryGithubPrefixedReference(cleaned: string): Reference | null | undefined {
   const githubPrefixed = cleaned.match(/^github:([^/\s]+)\/([^/\s]+)$/)
-  if (githubPrefixed) {
-    return buildRemoteReference({ host: "github.com", segments: [githubPrefixed[1], githubPrefixed[2]] })
+  if (!githubPrefixed) return undefined
+  return buildRemoteReference({ host: "github.com", segments: [githubPrefixed[1], githubPrefixed[2]] })
+}
+
+function tryScpReference(cleaned: string): Reference | null | undefined {
+  const scp = cleaned.match(/^(?:[^@/\s]+@)?([^:/\s]+):(.+)$/)
+  if (!scp) return undefined
+  return buildRemoteReference({ host: scp[1], segments: parts(scp[2]), remote: cleaned })
+}
+
+function tryDirectReference(cleaned: string): Reference | null | undefined {
+  const direct = parts(cleaned)
+  if (direct.length >= 2 && hostLike(direct[0])) {
+    return buildRemoteReference({ host: direct[0], segments: direct.slice(1) })
   }
-
-  if (!cleaned.includes("://")) {
-    const scp = cleaned.match(/^(?:[^@/\s]+@)?([^:/\s]+):(.+)$/)
-    if (scp) return buildRemoteReference({ host: scp[1], segments: parts(scp[2]), remote: cleaned })
-
-    const direct = parts(cleaned)
-    if (direct.length >= 2 && hostLike(direct[0])) {
-      return buildRemoteReference({ host: direct[0], segments: direct.slice(1) })
-    }
-
-    if (direct.length === 2) {
-      return buildRemoteReference({ host: "github.com", segments: direct })
-    }
+  if (direct.length === 2) {
+    return buildRemoteReference({ host: "github.com", segments: direct })
   }
+  return undefined
+}
 
+function tryShorthandReference(cleaned: string): Reference | null | undefined {
+  if (cleaned.includes("://")) return undefined
+  const scpResult = tryScpReference(cleaned)
+  if (scpResult !== undefined) return scpResult
+  return tryDirectReference(cleaned)
+}
+
+function tryUrlReference(cleaned: string): Reference | null {
   try {
     const url = new URL(cleaned)
     if (url.protocol === "file:") return buildFileReference({ url, remote: cleaned })
@@ -174,7 +183,18 @@ export function parseRepositoryReference(input: string) {
     return null
   }
 }
+export function parseRepositoryReference(input: string): Reference | null {
+  const cleaned = normalizeRepositoryInput(input)
+  if (!cleaned) return null
 
+  const githubPrefixed = tryGithubPrefixedReference(cleaned)
+  if (githubPrefixed !== undefined) return githubPrefixed
+
+  const shorthand = tryShorthandReference(cleaned)
+  if (shorthand !== undefined) return shorthand
+
+  return tryUrlReference(cleaned)
+}
 export function isFileRepositoryReference(reference: Reference): reference is FileReference {
   return reference.protocol === "file:"
 }
