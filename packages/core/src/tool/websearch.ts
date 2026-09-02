@@ -149,14 +149,16 @@ const exaUrl = (apiKey: string | undefined) => {
   return url.toString()
 }
 
-const callMcp = <F extends Schema.Struct.Fields>(
-  http: HttpClient.HttpClient,
-  url: string,
-  tool: string,
-  args: Schema.Struct<F>,
-  value: Schema.Struct.Type<F>,
-  headers: Record<string, string> = {},
-) =>
+interface McpCallOptions<F extends Schema.Struct.Fields> {
+  readonly http: HttpClient.HttpClient
+  readonly url: string
+  readonly tool: string
+  readonly args: Schema.Struct<F>
+  readonly value: Schema.Struct.Type<F>
+  readonly headers?: Record<string, string>
+}
+
+const callMcp = <F extends Schema.Struct.Fields>({ http, url, tool, args, value, headers = {} }: McpCallOptions<F>) =>
   Effect.gen(function* () {
     const request = yield* HttpClientRequest.post(url).pipe(
       HttpClientRequest.accept("application/json, text/event-stream"),
@@ -218,29 +220,35 @@ const layer = Layer.effectDiscard(
 
               const text =
                 provider === "exa"
-                  ? yield* callMcp(http, exaUrl(config.exaApiKey), "web_search_exa", ExaArgs, {
-                      query: input.query,
-                      type: input.type || "auto",
-                      numResults: input.numResults || 8,
-                      livecrawl: input.livecrawl || "fallback",
-                      contextMaxCharacters: input.contextMaxCharacters,
-                    })
-                  : yield* callMcp(
+                  ? yield* callMcp({
                       http,
-                      PARALLEL_URL,
-                      "web_search",
-                      ParallelArgs,
-                      {
+                      url: exaUrl(config.exaApiKey),
+                      tool: "web_search_exa",
+                      args: ExaArgs,
+                      value: {
+                        query: input.query,
+                        type: input.type || "auto",
+                        numResults: input.numResults || 8,
+                        livecrawl: input.livecrawl || "fallback",
+                        contextMaxCharacters: input.contextMaxCharacters,
+                      },
+                    })
+                  : yield* callMcp({
+                      http,
+                      url: PARALLEL_URL,
+                      tool: "web_search",
+                      args: ParallelArgs,
+                      value: {
                         objective: input.query,
                         search_queries: [input.query],
                         session_id: context.sessionID,
                         // V2 invocation context does not safely expose the model yet.
                       },
-                      {
+                      headers: {
                         "User-Agent": `opencode/${InstallationVersion}`,
                         ...(config.parallelApiKey ? { Authorization: `Bearer ${config.parallelApiKey}` } : {}),
                       },
-                    )
+                    })
               return {
                 provider,
                 text: text ?? NO_RESULTS,
