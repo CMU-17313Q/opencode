@@ -1,5 +1,6 @@
 import * as http from "node:http"
 import * as tls from "node:tls"
+import { parseCommand, type StartCommand } from "./sidecar-command"
 
 type NodeHttpWithEnvProxy = typeof http & {
   setGlobalProxyFromEnv: () => void
@@ -9,18 +10,6 @@ type NodeTlsWithSystemCertificates = typeof tls & {
   getCACertificates: (type: "default" | "system") => string[]
   setDefaultCACertificates: (certificates: string[]) => void
 }
-
-type StartCommand = {
-  type: "start"
-  hostname: string
-  port: number
-  password: string
-  userDataPath: string
-}
-
-type StopCommand = { type: "stop" }
-type SidecarCommand = StartCommand | StopCommand
-
 type SidecarMessage =
   | { type: "ready" }
   | { type: "stopped" }
@@ -127,23 +116,6 @@ function useEnvProxy() {
   }
 }
 
-function parseCommand(value: unknown): SidecarCommand | undefined {
-  if (!value || typeof value !== "object") return
-  const command = value as Partial<StartCommand | StopCommand>
-  if (command.type === "stop") return { type: "stop" }
-  if (command.type !== "start") return
-  if (typeof command.hostname !== "string") return
-  if (typeof command.port !== "number") return
-  if (typeof command.password !== "string") return
-  if (typeof command.userDataPath !== "string") return
-  return {
-    type: "start",
-    hostname: command.hostname,
-    port: command.port,
-    password: command.password,
-    userDataPath: command.userDataPath,
-  }
-}
 
 function serializeError(error: unknown) {
   if (error instanceof Error) return { message: error.message, stack: error.stack }
