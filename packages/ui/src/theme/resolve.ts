@@ -1,6 +1,45 @@
 import type { ColorValue, DesktopTheme, HexColor, ResolvedTheme, ThemeVariant } from "./types"
 import { blend, generateNeutralScale, generateScale, hexToOklch, hexToRgb, shift, withAlpha } from "./color"
 
+function channelLift(v: number): number {
+  return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+}
+
+export function relativeLuminance(hex: HexColor): number {
+  const rgb = hexToRgb(hex)
+  return 0.2126 * channelLift(rgb.r) + 0.7152 * channelLift(rgb.g) + 0.0722 * channelLift(rgb.b)
+}
+
+export function contrastRatio(a: HexColor, b: HexColor): number {
+  const x = relativeLuminance(a)
+  const y = relativeLuminance(b)
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+}
+
+export function readableTextOn(fill: HexColor): HexColor {
+  const light = "#ffffff" as HexColor
+  const dark = "#000000" as HexColor
+  return contrastRatio(light, fill) > contrastRatio(dark, fill) ? light : dark
+}
+
+export function contentTone(seed: HexColor, scale: HexColor[], isDark: boolean): HexColor {
+  const base = hexToOklch(seed)
+  const value = isDark && base.l > 0.84 ? shift(seed, { c: 1.18 }) : scale[10]
+  return shift(value, { l: isDark ? 0.034 : -0.024, c: isDark ? 1.3 : 1.18 })
+}
+
+export function hueDistance(a: number, b: number): number {
+  return Math.abs(((((b - a) % 360) + 540) % 360) - 180)
+}
+
+export function modifiedDiffTone(colors: ThemeColors, warningScale: HexColor[], isDark: boolean): HexColor {
+  const fallback = (isDark ? "#ffba92" : "#FF8C00") as HexColor
+  if (!colors.compact) return fallback
+  const delta = hueDistance(hexToOklch(colors.warning).h, hexToOklch(colors.diffDelete ?? colors.error).h)
+  if (delta < 48) return fallback
+  return contentTone(colors.warning, warningScale, isDark)
+}
+
 export function resolveThemeVariant(variant: ThemeVariant, isDark: boolean): ResolvedTheme {
   const colors = getColors(variant)
   const { overrides = {} } = variant
@@ -37,19 +76,9 @@ export function resolveThemeVariant(variant: ThemeVariant, isDark: boolean): Res
   const backgroundOverride = overrides["background-base"]
   const backgroundHex = getHex(backgroundOverride)
   const overlay = Boolean(backgroundOverride) && !backgroundHex
-  const content = (seed: HexColor, scale: HexColor[]) => {
-    const base = hexToOklch(seed)
-    const value = isDark ? (base.l > 0.84 ? shift(seed, { c: 1.18 }) : scale[10]) : scale[10]
-    return shift(value, { l: isDark ? 0.034 : -0.024, c: isDark ? 1.3 : 1.18 })
-  }
-  const modified = () => {
-    if (!colors.compact) return isDark ? "#ffba92" : "#FF8C00"
-    const warningHue = hexToOklch(colors.warning).h
-    const deleteHue = hexToOklch(colors.diffDelete ?? colors.error).h
-    const delta = Math.abs(((((deleteHue - warningHue) % 360) + 540) % 360) - 180)
-    if (delta < 48) return isDark ? "#ffba92" : "#FF8C00"
-    return content(colors.warning, warning)
-  }
+  const content = (seed: HexColor, scale: HexColor[]) => contentTone(seed, scale, isDark)
+  const modified = () => modifiedDiffTone(colors, warning, isDark)
+
   const surface = (
     seed: HexColor,
     alpha: { base: number; weak: number; weaker: number; strong: number; stronger: number },
@@ -93,24 +122,7 @@ export function resolveThemeVariant(variant: ThemeVariant, isDark: boolean): Res
   const infob = info[isDark ? 6 : 4]
   const infow = info[isDark ? 5 : 3]
   const infos = info[10]
-  const lum = (hex: HexColor) => {
-    const rgb = hexToRgb(hex)
-    const lift = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4))
-    return 0.2126 * lift(rgb.r) + 0.7152 * lift(rgb.g) + 0.0722 * lift(rgb.b)
-  }
-  const hit = (a: HexColor, b: HexColor) => {
-    const x = lum(a)
-    const y = lum(b)
-    const light = Math.max(x, y)
-    const dark = Math.min(x, y)
-    return (light + 0.05) / (dark + 0.05)
-  }
-  const on = (fill: HexColor) => {
-    const light = "#ffffff" as HexColor
-    const dark = "#000000" as HexColor
-    return hit(light, fill) > hit(dark, fill) ? light : dark
-  }
-
+  const on = readableTextOn
   const tokens: ResolvedTheme = {}
 
   tokens["background-base"] = neutral[0]
