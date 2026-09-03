@@ -100,6 +100,10 @@ export function hexToOklch(hex: HexColor): OklchColor {
   return rgbToOklch(r, g, b)
 }
 
+function isRgbInGamut(rgb: { r: number; g: number; b: number }) {
+  return Math.min(rgb.r, rgb.g, rgb.b) >= 0 && Math.max(rgb.r, rgb.g, rgb.b) <= 1
+}
+
 export function fitOklch(oklch: OklchColor): OklchColor {
   const base = {
     l: clamp(oklch.l, 0, 1),
@@ -117,7 +121,7 @@ export function fitOklch(oklch: OklchColor): OklchColor {
     c *= 0.9
     const next = { ...base, c }
     const out = oklchToRgb(next)
-    if (out.r >= 0 && out.r <= 1 && out.g >= 0 && out.g <= 1 && out.b >= 0 && out.b <= 1) {
+        if (isRgbInGamut(out)) {
       return next
     }
   }
