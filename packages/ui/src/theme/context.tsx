@@ -231,26 +231,39 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
 
     const loadThemes = () => Promise.all(themeIDs().map(load)).then(() => store.themes)
 
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEYS.THEME_ID && e.newValue) {
-        const next = normalize(e.newValue)
-        if (!next) return
-        if (next !== "oc-2" && !knownThemes().has(next) && !store.themes[next]) return
-        setStore("themeId", next)
-        if (next === "oc-2") {
-          clear()
-          return
-        }
-        void load(next).then((theme) => {
-          if (!theme || store.themeId !== next) return
-          cacheThemeVariants(theme, next)
-        })
-      }
-      if (e.key === STORAGE_KEYS.COLOR_SCHEME && e.newValue) {
-        setStore("colorScheme", e.newValue as ColorScheme)
-        setStore("mode", e.newValue === "system" ? getSystemMode() : (e.newValue as "light" | "dark"))
-      }
+  const handleThemeChange = (newValue: string) => {
+    const next = normalize(newValue);
+    if (!next) return;
+
+    if (next !== "oc-2" && !knownThemes().has(next) && !store.themes[next]) return;
+
+    setStore("themeId", next);
+
+    if (next === "oc-2") {
+      clear();
+      return;
     }
+
+    void load(next).then((theme) => {
+      if (!theme || store.themeId !== next) return;
+      cacheThemeVariants(theme, next);
+    });
+  };
+
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEYS.THEME_ID && e.newValue) {
+      handleThemeChange(e.newValue);
+    }
+
+    if (e.key === STORAGE_KEYS.COLOR_SCHEME && e.newValue) {
+      setStore("colorScheme", e.newValue as ColorScheme);
+      setStore(
+        "mode",
+        e.newValue === "system" ? getSystemMode() : (e.newValue as "light" | "dark")
+      );
+    }
+  };
+
 
     onMount(() => {
       makeEventListener(window, "storage", onStorage)
