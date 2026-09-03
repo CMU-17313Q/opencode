@@ -22,6 +22,67 @@ interface ScannerState {
   isMovingForward: boolean
 }
 
+function getBidirectionalScannerState(
+  frameIndex: number,
+  totalChars: number,
+  holdFrames: NonNullable<AdvancedGradientOptions["holdFrames"]>,
+): ScannerState {
+  const forwardFrames = totalChars
+  const holdEndFrames = holdFrames.end ?? 0
+  const backwardFrames = totalChars - 1
+
+  if (frameIndex < forwardFrames) {
+    // Moving forward
+    return {
+      activePosition: frameIndex,
+      isHolding: false,
+      holdProgress: 0,
+      holdTotal: 0,
+      movementProgress: frameIndex,
+      movementTotal: forwardFrames,
+      isMovingForward: true,
+    }
+  }
+
+  if (frameIndex < forwardFrames + holdEndFrames) {
+    // Holding at end
+    return {
+      activePosition: totalChars - 1,
+      isHolding: true,
+      holdProgress: frameIndex - forwardFrames,
+      holdTotal: holdEndFrames,
+      movementProgress: 0,
+      movementTotal: 0,
+      isMovingForward: true,
+    }
+  }
+
+  if (frameIndex < forwardFrames + holdEndFrames + backwardFrames) {
+    // Moving backward
+    const backwardIndex = frameIndex - forwardFrames - holdEndFrames
+    return {
+      activePosition: totalChars - 2 - backwardIndex,
+      isHolding: false,
+      holdProgress: 0,
+      holdTotal: 0,
+      movementProgress: backwardIndex,
+      movementTotal: backwardFrames,
+      isMovingForward: false,
+    }
+  }
+
+  // Holding at start
+  return {
+    activePosition: 0,
+    isHolding: true,
+    holdProgress: frameIndex - forwardFrames - holdEndFrames - backwardFrames,
+    holdTotal: holdFrames.start ?? 0,
+    movementProgress: 0,
+    movementTotal: 0,
+    isMovingForward: false,
+  }
+}
+
 function getScannerState(
   frameIndex: number,
   totalChars: number,
@@ -30,57 +91,10 @@ function getScannerState(
   const { direction = "forward", holdFrames = {} } = options
 
   if (direction === "bidirectional") {
-    const forwardFrames = totalChars
-    const holdEndFrames = holdFrames.end ?? 0
-    const backwardFrames = totalChars - 1
+    return getBidirectionalScannerState(frameIndex, totalChars, holdFrames)
+  }
 
-    if (frameIndex < forwardFrames) {
-      // Moving forward
-      return {
-        activePosition: frameIndex,
-        isHolding: false,
-        holdProgress: 0,
-        holdTotal: 0,
-        movementProgress: frameIndex,
-        movementTotal: forwardFrames,
-        isMovingForward: true,
-      }
-    } else if (frameIndex < forwardFrames + holdEndFrames) {
-      // Holding at end
-      return {
-        activePosition: totalChars - 1,
-        isHolding: true,
-        holdProgress: frameIndex - forwardFrames,
-        holdTotal: holdEndFrames,
-        movementProgress: 0,
-        movementTotal: 0,
-        isMovingForward: true,
-      }
-    } else if (frameIndex < forwardFrames + holdEndFrames + backwardFrames) {
-      // Moving backward
-      const backwardIndex = frameIndex - forwardFrames - holdEndFrames
-      return {
-        activePosition: totalChars - 2 - backwardIndex,
-        isHolding: false,
-        holdProgress: 0,
-        holdTotal: 0,
-        movementProgress: backwardIndex,
-        movementTotal: backwardFrames,
-        isMovingForward: false,
-      }
-    } else {
-      // Holding at start
-      return {
-        activePosition: 0,
-        isHolding: true,
-        holdProgress: frameIndex - forwardFrames - holdEndFrames - backwardFrames,
-        holdTotal: holdFrames.start ?? 0,
-        movementProgress: 0,
-        movementTotal: 0,
-        isMovingForward: false,
-      }
-    }
-  } else if (direction === "backward") {
+  if (direction === "backward") {
     return {
       activePosition: totalChars - 1 - (frameIndex % totalChars),
       isHolding: false,
@@ -90,16 +104,16 @@ function getScannerState(
       movementTotal: totalChars,
       isMovingForward: false,
     }
-  } else {
-    return {
-      activePosition: frameIndex % totalChars,
-      isHolding: false,
-      holdProgress: 0,
-      holdTotal: 0,
-      movementProgress: frameIndex % totalChars,
-      movementTotal: totalChars,
-      isMovingForward: true,
-    }
+  }
+
+  return {
+    activePosition: frameIndex % totalChars,
+    isHolding: false,
+    holdProgress: 0,
+    holdTotal: 0,
+    movementProgress: frameIndex % totalChars,
+    movementTotal: totalChars,
+    isMovingForward: true,
   }
 }
 
