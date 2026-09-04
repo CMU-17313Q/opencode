@@ -1,54 +1,56 @@
+import { error } from "node:console";
 import { isRecord } from "./record"
 
 type ConfigIssue = { message: string; path: string[] }
 
 export function cliErrorMessage(input: unknown): string | undefined {
+
+  var error_msg: string | undefined = undefined; 
+
   if (input instanceof Error && isRecord(input.cause) && "body" in input.cause) {
     const formatted = cliErrorMessage(input.cause.body)
-    if (formatted) return formatted
+    if (formatted && error_msg === undefined) error_msg = formatted
+    
+  } else if (tagged(input, "CliError") ||
+             tagged(input, "AccountServiceError") ||
+             tagged(input, "AccountTransportError")) {
+    if (tagged(input, "CliError") && typeof input.exitCode === "number") {
+      process.exitCode = input.exitCode
+    }
+    error_msg = field(input, "message") ?? ""
   }
 
-  if (tagged(input, "CliError")) {
-    if (typeof input.exitCode === "number") process.exitCode = input.exitCode
-    return field(input, "message") ?? ""
-  }
-  if (tagged(input, "AccountServiceError") || tagged(input, "AccountTransportError")) {
-    return field(input, "message") ?? ""
+  if (error_msg !== undefined) {
+    return error_msg
   }
 
   const model = configData(input, "ProviderModelNotFoundError")
+  const provider = configData(input, "ProviderInitError")
+  const json = configData(input, "ConfigJsonError")
+  const directory = configData(input, "ConfigDirectoryTypoError")
+  const frontmatter = configData(input, "ConfigFrontmatterError")
+  const invalid = configData(input, "ConfigInvalidError")
+  
   if (model) {
     const suggestions = Array.isArray(model.suggestions)
       ? model.suggestions.filter((item): item is string => typeof item === "string")
       : []
-    return [
+    error_msg = [
       `Model not found: ${field(model, "providerID")}/${field(model, "modelID")}`,
       ...(suggestions.length ? ["Did you mean: " + suggestions.join(", ")] : []),
       "Try: `opencode models` to list available models",
       "Or check your config (opencode.json) provider/model names",
     ].join("\n")
-  }
-
-  const provider = configData(input, "ProviderInitError")
-  if (provider)
-    return `Failed to initialize provider "${field(provider, "providerID")}". Check credentials and configuration.`
-
-  const json = configData(input, "ConfigJsonError")
-  if (json) {
+  } else if (provider) {
+    error_msg = `Failed to initialize provider "${field(provider, "providerID")}". Check credentials and configuration.`
+  } else if (json) {
     const message = field(json, "message")
-    return `Config file at ${field(json, "path")} is not valid JSON(C)` + (message ? `: ${message}` : "")
-  }
-
-  const directory = configData(input, "ConfigDirectoryTypoError")
-  if (directory) {
-    return `Directory "${field(directory, "dir")}" in ${field(directory, "path")} is not valid. Rename the directory to "${field(directory, "suggestion")}" or remove it. This is a common typo.`
-  }
-
-  const frontmatter = configData(input, "ConfigFrontmatterError")
-  if (frontmatter) return field(frontmatter, "message") ?? ""
-
-  const invalid = configData(input, "ConfigInvalidError")
-  if (invalid) {
+    error_msg = `Config file at ${field(json, "path")} is not valid JSON(C)` + (message ? `: ${message}` : "")
+  } else if (directory) {
+    error_msg = `Directory "${field(directory, "dir")}" in ${field(directory, "path")} is not valid. Rename the directory to "${field(directory, "suggestion")}" or remove it. This is a common typo.`
+  } else if (frontmatter) {
+    error_msg = field(frontmatter, "message") ?? ""
+  } else if (invalid) {
     const path = field(invalid, "path")
     const message = field(invalid, "message")
     const issues = Array.isArray(invalid.issues)
@@ -61,18 +63,17 @@ export function cliErrorMessage(input: unknown): string | undefined {
           )
         })
       : []
-    return [
+    error_msg = [
       `Configuration is invalid${path && path !== "config" ? ` at ${path}` : ""}` + (message ? `: ${message}` : ""),
       ...issues.map((issue) => "↳ " + issue.message + " " + issue.path.join(".")),
     ].join("\n")
   }
-
-  if (tagged(input, "UICancelledError") || named(input, "UICancelledError")) return ""
-  if (isRecord(input) && named(input, "MCPFailed")) {
+  else if (tagged(input, "UICancelledError") || named(input, "UICancelledError")) error_msg = ""
+  else if (isRecord(input) && named(input, "MCPFailed")) {
     const name = isRecord(input.data) ? field(input.data, "name") : undefined
-    return `MCP server "${name}" failed. Note, opencode does not support MCP authentication yet.`
+    error_msg = `MCP server "${name}" failed. Note, opencode does not support MCP authentication yet.`
   }
-  return undefined
+  return error_msg
 }
 
 function tagged(input: unknown, tag: string): input is Record<string, unknown> {
