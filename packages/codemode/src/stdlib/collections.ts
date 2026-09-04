@@ -40,12 +40,18 @@ export const mapMethods = new Set(["get", "set", "has", "delete", "clear", "forE
 
 export const setMethods = new Set(["add", "has", "delete", "clear", "forEach", "keys", "values", "entries"])
 
+const spreadSandboxItems = (value: unknown): Array<unknown> | undefined => {
+  if (value instanceof SandboxMap) return Array.from(value.map.entries(), ([key, item]) => [key, item])
+  if (value instanceof SandboxSet) return Array.from(value.set.values())
+  if (value instanceof SandboxURLSearchParams) {
+    return Array.from(value.params as Iterable<[string, string]>, ([key, item]) => [key, item])
+  }
+  return undefined
+}
+
 export const spreadItems = (value: unknown): Array<unknown> | undefined => {
   if (Array.isArray(value)) return value
   if (typeof value === "string") return Array.from(value)
-  if (value instanceof SandboxMap) return Array.from(value.map.entries(), ([key, item]) => [key, item])
-  if (value instanceof SandboxSet) return Array.from(value.set.values())
-  if (value instanceof SandboxURLSearchParams) return Array.from(value.params.entries(), ([key, item]) => [key, item])
-  return undefined
+  return spreadSandboxItems(value)
 }
 import { SandboxMap, SandboxSet, SandboxURLSearchParams } from "../values.js"
