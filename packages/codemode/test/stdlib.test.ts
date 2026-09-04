@@ -366,6 +366,14 @@ describe("URL and URI helpers", () => {
     })
   })
 
+  test("URLSearchParams spread produces entry pairs", async () => {
+    expect(await value(`return [...new URLSearchParams("tag=a&tag=b&q=a+b")]`)).toEqual([
+      ["tag", "a"],
+      ["tag", "b"],
+      ["q", "a b"],
+    ])
+  })
+
   test("URL parsing failures are catchable and values use native JSON forms", async () => {
     expect(
       await value(`
