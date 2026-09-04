@@ -49,6 +49,49 @@ type ValidateArgs = {
 }
 
 export function validateCustomProvider(input: ValidateArgs) {
+  const base = validateBase(input)
+  const modelsValidation = validateModels(input.form.models, input.t)
+  const headersValidation = validateHeaders(input.form.headers, input.t)
+  
+  const baseValid = !base.err.providerID
+                 && !base.err.name
+                 && !base.err.baseURL
+  const ok = baseValid
+    && modelsValidation.modelsValid
+    && headersValidation.headersValid
+  if (!ok) return {
+    err: base.err,
+    models: modelsValidation.models,
+    headers: headersValidation.headers,
+  }
+
+  return {
+    err: base.err,
+    models: modelsValidation.models,
+    headers: headersValidation.headers,
+    result: {
+      providerID: base.providerID,
+      name: base.name,
+      key: base.key,
+      config: {
+        npm: OPENAI_COMPATIBLE,
+        name: base.name,
+        ...(base.env ? { env: [base.env] } : {}),
+        options: {
+          baseURL: base.baseURL,
+          ...(
+            Object.keys(headersValidation.headerConfig).length
+              ? { headers: headersValidation.headerConfig }
+              : {}
+          ),
+        },
+        models: modelsValidation.modelConfig,
+      },
+    },
+  }
+}
+
+function validateBase(input: ValidateArgs) {
   const providerID = input.form.providerID.trim()
   const name = input.form.name.trim()
   const baseURL = input.form.baseURL.trim()
@@ -77,77 +120,67 @@ export function validateCustomProvider(input: ValidateArgs) {
       ? input.t("provider.custom.error.providerID.exists")
       : undefined
 
+  return {
+    err: {
+      providerID: idError ?? existsError,
+      name: nameError,
+      baseURL: urlError,
+    },
+    providerID,
+    name,
+    baseURL,
+    key,
+    env,
+  }
+}
+
+function validateModels(rows: ModelRow[], t: Translator) {
   const seenModels = new Set<string>()
-  const models = input.form.models.map((m) => {
+
+  const models = rows.map((m) => {
     const id = m.id.trim()
     const idError = !id
-      ? input.t("provider.custom.error.required")
+      ? t("provider.custom.error.required")
       : seenModels.has(id)
-        ? input.t("provider.custom.error.duplicate")
-        : (() => {
-            seenModels.add(id)
-            return undefined
-          })()
-    const nameError = !m.name.trim() ? input.t("provider.custom.error.required") : undefined
+        ? t("provider.custom.error.duplicate")
+        : undefined
+    if (!idError) seenModels.add(id)
+    const nameError = !m.name.trim()
+      ? t("provider.custom.error.required")
+      : undefined
     return { id: idError, name: nameError }
   })
   const modelsValid = models.every((m) => !m.id && !m.name)
-  const modelConfig = Object.fromEntries(input.form.models.map((m) => [m.id.trim(), { name: m.name.trim() }]))
+  const modelConfig = Object.fromEntries(rows.map((m) => [m.id.trim(), { name: m.name.trim() }]))
 
+  return { models, modelsValid, modelConfig }
+}
+
+function validateHeaders(rows: HeaderRow[], t: Translator) {
   const seenHeaders = new Set<string>()
-  const headers = input.form.headers.map((h) => {
+  const headers = rows.map((h) => {
     const key = h.key.trim()
     const value = h.value.trim()
-
     if (!key && !value) return {}
     const keyError = !key
-      ? input.t("provider.custom.error.required")
+      ? t("provider.custom.error.required")
       : seenHeaders.has(key.toLowerCase())
-        ? input.t("provider.custom.error.duplicate")
-        : (() => {
-            seenHeaders.add(key.toLowerCase())
-            return undefined
-          })()
-    const valueError = !value ? input.t("provider.custom.error.required") : undefined
+        ? t("provider.custom.error.duplicate")
+        : undefined
+    if (!keyError) seenHeaders.add(key.toLowerCase())
+    const valueError = !value ? t("provider.custom.error.required") : undefined
     return { key: keyError, value: valueError }
   })
   const headersValid = headers.every((h) => !h.key && !h.value)
+
   const headerConfig = Object.fromEntries(
-    input.form.headers
+    rows
       .map((h) => ({ key: h.key.trim(), value: h.value.trim() }))
       .filter((h) => !!h.key && !!h.value)
       .map((h) => [h.key, h.value]),
   )
 
-  const err = {
-    providerID: idError ?? existsError,
-    name: nameError,
-    baseURL: urlError,
-  }
-
-  const ok = !idError && !existsError && !nameError && !urlError && modelsValid && headersValid
-  if (!ok) return { err, models, headers }
-
-  return {
-    err,
-    models,
-    headers,
-    result: {
-      providerID,
-      name,
-      key,
-      config: {
-        npm: OPENAI_COMPATIBLE,
-        name,
-        ...(env ? { env: [env] } : {}),
-        options: {
-          baseURL,
-          ...(Object.keys(headerConfig).length ? { headers: headerConfig } : {}),
-        },
-        models: modelConfig,
-      },
-    },
-  }
+  return { headers, headersValid, headerConfig }
 }
 
 let row = 0
