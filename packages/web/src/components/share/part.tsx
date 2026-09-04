@@ -1,4 +1,5 @@
 import map from "lang-map"
+import { flattenToolArgs } from "./part-utils"
 import { DateTime } from "luxon"
 import { For, Show, Match, Switch, type JSX, createMemo, createSignal, type ParentProps } from "solid-js"
 import {
@@ -751,36 +752,6 @@ export function FallbackTool(props: ToolProps) {
       </Switch>
     </>
   )
-}
-
-// Converts nested objects/arrays into [path, value] pairs.
-// E.g. {a:{b:{c:1}}, d:[{e:2}, 3]} => [["a.b.c",1], ["d[0].e",2], ["d[1]",3]]
-function flattenToolArgs(obj: unknown, prefix: string = ""): Array<[string, unknown]> {
-  const entries: Array<[string, unknown]> = []
-  if (typeof obj !== "object" || obj === null) return entries
-
-  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-    const path = prefix ? `${prefix}.${key}` : key
-
-    if (value !== null && typeof value === "object") {
-      if (Array.isArray(value)) {
-        value.forEach((item, index) => {
-          const arrayPath = `${path}[${index}]`
-          if (item !== null && typeof item === "object") {
-            entries.push(...flattenToolArgs(item, arrayPath))
-          } else {
-            entries.push([arrayPath, item])
-          }
-        })
-      } else {
-        entries.push(...flattenToolArgs(value, path))
-      }
-    } else {
-      entries.push([path, value])
-    }
-  }
-
-  return entries
 }
 
 function getProvider(model: string) {
