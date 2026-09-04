@@ -713,3 +713,16 @@ describe("sandbox values at intra-sandbox checkpoints", () => {
     expect(observed).toStrictEqual([{ when: "1970-01-01T00:00:00.000Z", tags: {} }])
   })
 })
+
+describe("array-to-string coercion", () => {
+  test("String() on an array joins elements with commas, treating null/undefined as empty", async () => {
+    expect(await value(`return String([1, null, undefined, 2])`)).toBe("1,,,2")
+  })
+})
+
+describe("parseInt radix validation", () => {
+  test("rejects a non-numeric radix", async () => {
+    const err = await error(`return parseInt("10", "x")`)
+    expect(err.message).toContain("parseInt expects a numeric radix.")
+  })
+})
