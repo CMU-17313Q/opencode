@@ -1,0 +1,5 @@
+{
+  "name": "Build Checkpoint",
+  "image": "oven/bun:1.3",
+  "postCreateCommand": "apt-get update && apt-get install -y python3 make g++ curl xz-utils ca-certificates git && curl -fsSL https://qlty.sh | bash"
+}
