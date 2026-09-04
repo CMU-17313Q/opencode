@@ -1,6 +1,7 @@
 import { Select as Kobalte } from "@kobalte/core/select"
 import { Show, createMemo, onCleanup, splitProps, type ComponentProps, type JSX } from "solid-js"
 import "./select-v2.css"
+import { getSelectedValue } from "./select-v2-utils"
 
 function groupOptions<T>(options: T[], groupBy?: (x: T) => string): { category: string; options: T[] }[] {
   if (!groupBy) {
@@ -60,6 +61,38 @@ export type SelectV2Props<T> = Omit<
   children?: (item: T) => JSX.Element
   valueClass?: string
 }
+function createHighlightMover<T>(
+  onHighlight: ((value: T | undefined) => void | (() => void)) | undefined,
+  keyFor: (item: T) => string,
+) {
+  const state: { key?: string; cleanup?: void | (() => void) } = {}
+
+  const stop = () => {
+    state.cleanup?.()
+    state.cleanup = undefined
+    state.key = undefined
+  }
+
+  const move = (item: T | undefined) => {
+    if (!onHighlight) return
+    if (!item) {
+      stop()
+      return
+    }
+    const key = keyFor(item)
+    if (state.key === key) return
+    state.cleanup?.()
+    state.cleanup = onHighlight(item)
+    state.key = key
+  }
+
+  return { move, stop }
+}
+
+function handleOpenChange(open: boolean, onOpenChange: ((open: boolean) => void) | undefined, stop: () => void) {
+  onOpenChange?.(open)
+  if (!open) stop()
+}
 
 export function SelectV2<T>(props: SelectV2Props<T>) {
   const [local, others] = splitProps(props, [
@@ -90,32 +123,25 @@ export function SelectV2<T>(props: SelectV2Props<T>) {
 
   const inline = () => (local.appearance ?? "base") === "inline"
 
-  const state: { key?: string; cleanup?: void | (() => void) } = {}
-
-  const stop = () => {
-    state.cleanup?.()
-    state.cleanup = undefined
-    state.key = undefined
-  }
-
   const keyFor = (item: T) => (local.value ? local.value(item) : String(item as string))
-
-  const move = (item: T | undefined) => {
-    if (!local.onHighlight) return
-    if (!item) {
-      stop()
-      return
-    }
-    const key = keyFor(item)
-    if (state.key === key) return
-    state.cleanup?.()
-    state.cleanup = local.onHighlight(item)
-    state.key = key
-  }
+  const { move, stop } = createHighlightMover(local.onHighlight, keyFor)
 
   onCleanup(stop)
 
   const grouped = createMemo(() => groupOptions(local.options, local.groupBy))
+  const getOptionValue = (item: T) => (local.value ? local.value(item) : String(item as string))
+  const getOptionLabel = (item: T) => (local.label ? local.label(item) : String(item as string))
+
+  const placement = local.placement ?? (inline() ? "bottom-end" : "bottom-start")
+  const sameWidth = local.sameWidth ?? !inline()
+  const flip = local.flip ?? true
+  const slide = local.slide ?? true
+  const fitViewport = local.fitViewport ?? false
+
+  const renderSelectedValue = (selected: T | undefined) => {
+    if (local.label && selected != null) return local.label(selected)
+    return selected != null ? (selected as string) : ""
+  }
 
   return (
     <Kobalte<T, { category: string; options: T[] }>
@@ -124,16 +150,16 @@ export function SelectV2<T>(props: SelectV2Props<T>) {
       allowDuplicateSelectionEvents={false}
       disabled={local.disabled}
       data-component="select-v2-root"
-      placement={local.placement ?? (inline() ? "bottom-end" : "bottom-start")}
+      placement={placement}
       gutter={local.gutter ?? 4}
-      sameWidth={local.sameWidth ?? !inline()}
-      flip={local.flip ?? true}
-      slide={local.slide ?? true}
-      fitViewport={local.fitViewport ?? false}
+      sameWidth={sameWidth}
+      flip={flip}
+      slide={slide}
+      fitViewport={fitViewport}
       value={local.current}
       options={grouped()}
-      optionValue={(x) => (local.value ? local.value(x) : String(x as string))}
-      optionTextValue={(x) => (local.label ? local.label(x) : String(x as string))}
+      optionValue={getOptionValue}
+      optionTextValue={getOptionLabel}
       optionGroupChildren="options"
       placeholder={local.placeholder}
       sectionComponent={(sectionProps) => (
@@ -164,14 +190,10 @@ export function SelectV2<T>(props: SelectV2Props<T>) {
         </Kobalte.Item>
       )}
       onChange={(next) => {
-        const v = next == null ? null : Array.isArray(next) ? ((next[0] as T) ?? null) : (next as T)
-        local.onSelect?.(v)
+        local.onSelect?.(getSelectedValue(next))
         stop()
       }}
-      onOpenChange={(open) => {
-        local.onOpenChange?.(open)
-        if (!open) stop()
-      }}
+      onOpenChange={(open) => handleOpenChange(open, local.onOpenChange, stop)}
     >
       <Kobalte.Trigger
         as="div"
@@ -188,11 +210,7 @@ export function SelectV2<T>(props: SelectV2Props<T>) {
       >
         <div data-slot="select-v2-value">
           <Kobalte.Value<T> data-slot="select-v2-value-text" class={local.valueClass}>
-            {(st) => {
-              const selected = st.selectedOption()
-              if (local.label && selected != null) return local.label(selected)
-              return selected != null ? (selected as string) : ""
-            }}
+            {(st) => renderSelectedValue(st.selectedOption())}
           </Kobalte.Value>
         </div>
         <span data-slot="select-v2-chevron" aria-hidden="true">
