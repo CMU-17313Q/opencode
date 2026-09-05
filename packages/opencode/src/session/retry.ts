@@ -60,6 +60,7 @@ export function delay(attempt: number, error?: SessionV1.APIError) {
           // convert seconds to milliseconds
           return cap(Math.ceil(parsedSeconds * 1000))
         }
+
         // Try parsing as HTTP date format
         const parsed = Date.parse(retryAfter) - Date.now()
         if (!Number.isNaN(parsed) && parsed > 0) {
@@ -77,72 +78,119 @@ export function delay(attempt: number, error?: SessionV1.APIError) {
 export function retryable(error: Err, provider: string) {
   // context overflow errors should not be retried
   if (SessionV1.ContextOverflowError.isInstance(error)) return undefined
+
   if (SessionV1.APIError.isInstance(error)) {
-    const status = error.data.statusCode
-    // 5xx errors are transient server failures and should always be retried,
-    // even when the provider SDK doesn't explicitly mark them as retryable.
-    if (
-      !error.data.isRetryable &&
-      !(status !== undefined && status >= 500) &&
-      !matchesRetryableMessage(error.data.message) &&
-      !matchesRetryableMessage(error.data.responseBody)
-    )
-      return undefined
-    if (error.data.responseBody?.includes("FreeUsageLimitError")) {
-      return {
-        message: GO_UPSELL_MESSAGE,
-        action: {
-          reason: "free_tier_limit",
-          provider,
-          title: "Free limit reached",
-          message: "Subscribe to OpenCode Go for reliable access to the best open-source models, starting at $5/month.",
-          label: "subscribe",
-          link: GO_UPSELL_URL,
-        },
-      }
-    }
-    if (error.data.responseBody?.includes("GoUsageLimitError")) {
-      const body = parseJSON(error.data.responseBody)
-      const workspace = str(body?.metadata?.workspace)
-      const limitName = str(body?.metadata?.limitName)
-      const retryAfter = num(error.data.responseHeaders?.["retry-after"])
-      const resetIn = iife(() => {
-        if (retryAfter === undefined) return ""
-        const seconds = Math.max(0, Math.ceil(retryAfter))
-        const days = Math.floor(seconds / 86_400)
-        const hours = Math.floor((seconds % 86_400) / 3_600)
-        const minutes = Math.ceil((seconds % 3_600) / 60)
-        const unit = (value: number, name: string) => `${value} ${name}${value === 1 ? "" : "s"}`
-
-        if (days > 0) return hours > 0 ? `${unit(days, "day")} ${unit(hours, "hour")}` : unit(days, "day")
-        if (hours > 0) return minutes > 0 ? `${unit(hours, "hour")} ${unit(minutes, "minute")}` : unit(hours, "hour")
-        return minutes > 0 ? unit(minutes, "minute") : "less than a minute"
-      })
-
-      const message = `${limitName ? `${limitName} usage limit` : "Usage limit"} reached. It will reset in ${resetIn}. To continue using this model now, enable usage from your available balance`
-
-      const link = `https://opencode.ai/workspace/${workspace}/go`
-      return {
-        message: `${message} - ${link}`,
-        action: {
-          reason: "account_rate_limit",
-          provider,
-          title: "Go limit reached",
-          message,
-          label: "open settings",
-          link,
-        },
-      }
-    }
-    return { message: error.data.message.includes("Overloaded") ? "Provider is overloaded" : error.data.message }
+    return retryableAPIError(error, provider)
   }
 
+  return retryableOtherError(error)
+}
+
+function retryableAPIError(error: SessionV1.APIError, provider: string): Retryable | undefined {
+  const status = error.data.statusCode
+
+  // 5xx errors are transient server failures and should always be retried,
+  // even when the provider SDK doesn't explicitly mark them as retryable.
+  if (
+    !error.data.isRetryable &&
+    !(status !== undefined && status >= 500) &&
+    !matchesRetryableMessage(error.data.message) &&
+    !matchesRetryableMessage(error.data.responseBody)
+  ) {
+    return undefined
+  }
+
+  if (error.data.responseBody?.includes("FreeUsageLimitError")) {
+    return freeUsageLimitRetry(provider)
+  }
+
+  if (error.data.responseBody?.includes("GoUsageLimitError")) {
+    return goUsageLimitRetry(error, provider)
+  }
+
+  return {
+    message: error.data.message.includes("Overloaded") ? "Provider is overloaded" : error.data.message,
+  }
+}
+
+function freeUsageLimitRetry(provider: string): Retryable {
+  return {
+    message: GO_UPSELL_MESSAGE,
+    action: {
+      reason: "free_tier_limit",
+      provider,
+      title: "Free limit reached",
+      message: "Subscribe to OpenCode Go for reliable access to the best open-source models, starting at $5/month.",
+      label: "subscribe",
+      link: GO_UPSELL_URL,
+    },
+  }
+}
+
+function goUsageLimitRetry(error: SessionV1.APIError, provider: string): Retryable {
+  const body = parseJSON(error.data.responseBody)
+  const workspace = str(body?.metadata?.workspace)
+  const limitName = str(body?.metadata?.limitName)
+  const retryAfter = num(error.data.responseHeaders?.["retry-after"])
+  const resetIn = formatResetIn(retryAfter)
+
+  const message = `${limitName ? `${limitName} usage limit` : "Usage limit"} reached. It will reset in ${resetIn}. To continue using this model now, enable usage from your available balance`
+  const link = `https://opencode.ai/workspace/${workspace}/go`
+
+  return {
+    message: `${message} - ${link}`,
+    action: {
+      reason: "account_rate_limit",
+      provider,
+      title: "Go limit reached",
+      message,
+      label: "open settings",
+      link,
+    },
+  }
+}
+
+function formatResetIn(retryAfter: number | undefined) {
+  let result = ""
+
+  if (retryAfter !== undefined) {
+    const seconds = Math.max(0, Math.ceil(retryAfter))
+    const days = Math.floor(seconds / 86_400)
+    const hours = Math.floor((seconds % 86_400) / 3_600)
+    const minutes = Math.ceil((seconds % 3_600) / 60)
+    const unit = (value: number, name: string) => `${value} ${name}${value === 1 ? "" : "s"}`
+
+    if (days > 0) {
+      result = hours > 0 ? `${unit(days, "day")} ${unit(hours, "hour")}` : unit(days, "day")
+    } else if (hours > 0) {
+      result = minutes > 0 ? `${unit(hours, "hour")} ${unit(minutes, "minute")}` : unit(hours, "hour")
+    } else {
+      result = minutes > 0 ? unit(minutes, "minute") : "less than a minute"
+    }
+  }
+
+  return result
+}
+
+function retryableOtherError(error: Err): Retryable | undefined {
   const message = isRecord(error.data) ? error.data.message : undefined
+
   if (typeof message !== "string") return undefined
+
   const lower = message.toLowerCase()
-  if (lower.includes("too_many_requests")) return { message: "Too Many Requests" }
-  if (lower.includes("exhausted") || lower.includes("unavailable")) return { message: "Provider is overloaded" }
-  if (matchesRetryableMessage(message)) return { message }
+
+  if (lower.includes("too_many_requests")) {
+    return { message: "Too Many Requests" }
+  }
+
+  if (lower.includes("exhausted") || lower.includes("unavailable")) {
+    return { message: "Provider is overloaded" }
+  }
+
+  if (matchesRetryableMessage(message)) {
+    return { message }
+  }
+
   return undefined
 }
 
@@ -181,16 +229,20 @@ export function policy(opts: {
     Effect.succeed((meta: Schedule.InputMetadata<unknown>) => {
       const error = opts.parse(meta.input)
       const retry = retryable(error, opts.provider)
+
       if (!retry) return Cause.done(meta.attempt)
+
       return Effect.gen(function* () {
         const wait = delay(meta.attempt, SessionV1.APIError.isInstance(error) ? error : undefined)
         const now = yield* Clock.currentTimeMillis
+
         yield* opts.set({
           attempt: meta.attempt,
           message: retry.message,
           action: retry.action,
           next: now + wait,
         })
+
         return [meta.attempt, Duration.millis(wait)] as [number, Duration.Duration]
       })
     }),
