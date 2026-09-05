@@ -145,6 +145,33 @@ export namespace Flock {
     return now - dir.mtimeMs > staleMs
   }
 
+  //This Helper function reads and validates the lock token from the meta.json file
+  //This helper function was created to reduce the complexity of the function release
+  async function readLockToken(metaPath: string): Promise<string | undefined> {
+    try {
+      //read and parse the metdata file 
+      const raw = await readFile(metaPath, "utf8")
+      const parsed = JSON.parse(raw)
+
+      //ensure payload is an object
+      if (!parsed || typeof parsed !== "object") return undefined
+
+      //extract ownership token string is present
+      return "token" in parsed && typeof parsed.token === "string" ? parsed.token : undefined
+    } catch (err) {
+
+      //handle missing or invalid path errors
+      const errCode = code(err)
+      if (errCode === "ENOENT" || errCode === "ENOTDIR") {
+        throw new Error("Refusing to release: lock is compromised (metadata missing).")
+      }
+      if (err instanceof SyntaxError) {
+        throw new Error("Refusing to release: lock is compromised (metadata invalid).")
+      }
+      throw err
+    }
+  }
+
   async function tryAcquireLockDir(lockDir: string, opts: Opts): Promise<Owned | { acquired: false }> {
     const token = randomUUID?.() ?? randomBytes(16).toString("hex")
     const metaPath = path.join(lockDir, "meta.json")
@@ -232,37 +259,26 @@ export namespace Flock {
       timer.unref?.()
     }
 
-    const release = async () => {
-      if (timer) {
-        clearInterval(timer)
-        timer = undefined
-      }
-
-      const current = await readFile(metaPath, "utf8")
-        .then((raw) => {
-          const parsed = JSON.parse(raw)
-          if (!parsed || typeof parsed !== "object") return {}
-          return {
-            token: "token" in parsed && typeof parsed.token === "string" ? parsed.token : undefined,
-          }
-        })
-        .catch((err) => {
-          const errCode = code(err)
-          if (errCode === "ENOENT" || errCode === "ENOTDIR") {
-            throw new Error("Refusing to release: lock is compromised (metadata missing).")
-          }
-          if (err instanceof SyntaxError) {
-            throw new Error("Refusing to release: lock is compromised (metadata invalid).")
-          }
-          throw err
-        })
-      // Token check prevents deleting a lock that was re-acquired by another process.
-      if (current.token !== token) {
-        throw new Error("Refusing to release: lock token mismatch (not the owner).")
-      }
-
-      await rm(lockDir, { recursive: true, force: true })
+/**
+ * Releases the acquired lock.
+ * Stops heartbeat, verifies ownership token via readLockToken, and removes lock directory.
+ */
+  const release = async () => {
+    if (timer) {
+      clearInterval(timer)
+      timer = undefined
     }
+
+    // Read lock token from metadata file using extracted helper
+    const existingToken = await readLockToken(metaPath)
+
+    // Token check prevents deleting a lock that was re-acquired by another process.
+    if (existingToken !== token) {
+      throw new Error("Refusing to release: lock token mismatch (not the owner).")
+    }
+
+    await rm(lockDir, { recursive: true, force: true })
+  }
 
     return {
       acquired: true,
