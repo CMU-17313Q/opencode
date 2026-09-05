@@ -1,6 +1,9 @@
 import { Context } from "effect"
 
 const opencodeOrigin = /^https:\/\/([a-z0-9-]+\.)*opencode\.ai$/
+const allowedOriginPrefixes = ["http://localhost:", "http://127.0.0.1:", "oc://renderer"]
+
+const allowedOrigins = new Set(["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"])
 
 export type CorsOptions = { readonly cors?: ReadonlyArray<string> }
 
@@ -8,14 +11,15 @@ export const CorsConfig = Context.Reference<CorsOptions | undefined>("@opencode/
   defaultValue: () => undefined,
 })
 
+function isBuiltInAllowedOrigin(input: string) {
+  if (allowedOriginPrefixes.some((prefix) => input.startsWith(prefix))) return true
+  if (allowedOrigins.has(input)) return true
+  return opencodeOrigin.test(input)
+}
+
 export function isAllowedCorsOrigin(input: string | undefined, opts?: CorsOptions) {
   if (!input) return true
-  if (input.startsWith("http://localhost:")) return true
-  if (input.startsWith("http://127.0.0.1:")) return true
-  if (input.startsWith("oc://renderer")) return true
-  if (input === "tauri://localhost" || input === "http://tauri.localhost" || input === "https://tauri.localhost")
-    return true
-  if (opencodeOrigin.test(input)) return true
+  if (isBuiltInAllowedOrigin(input)) return true
   return opts?.cors?.includes(input) ?? false
 }
 
