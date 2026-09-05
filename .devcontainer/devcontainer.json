@@ -1,0 +1,12 @@
+{
+    "name": "OpenCode",
+    "image": "oven/bun:1.3",
+    "remoteUser": "bun",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:1": {
+            "username": "bun",
+            "upgradePackages": false
+        }
+    },
+    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y git python3 make g++ curl xz-utils && curl https://qlty.sh | bash && sudo ln -sf /home/bun/.qlty/bin/qlty /usr/local/bin/qlty"
+}
