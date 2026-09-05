@@ -23,5 +23,5 @@ declare module "lang-map" {
     function languages(extension: string): string[]
   }
 
-  export = map
+  export default map
 }
