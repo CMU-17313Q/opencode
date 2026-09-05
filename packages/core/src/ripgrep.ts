@@ -89,6 +89,27 @@ const failure = (message: string, cause?: unknown) => new Error({ message, cause
 const isInvalidPattern = (stderr: string) =>
   stderr.includes("regex parse error") || stderr.includes("error parsing regex")
 
+const handleExitCode = <A>(
+  code: number,
+  stderr: string,
+  pattern: string | undefined,
+  rows: readonly A[],
+) => {
+  if (pattern && code === 2 && isInvalidPattern(stderr)) {
+    return Effect.fail(new InvalidPatternError({ pattern, message: stderr.trim() }))
+  }
+
+  if (code !== 0 && code !== 1 && code !== 2) {
+    return Effect.fail(failure(stderr.trim() || `ripgrep failed with code ${code}`))
+  }
+
+  return Effect.succeed({
+    items: code === 1 ? [] : rows,
+    truncated: false,
+    partial: code === 2,
+  })
+}
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -132,13 +153,7 @@ const layer = Layer.effect(
 
           const code = yield* handle.exitCode
           const stderr = yield* Fiber.join(stderrFiber)
-          if (input.pattern && code === 2 && isInvalidPattern(stderr)) {
-            return yield* new InvalidPatternError({ pattern: input.pattern, message: stderr.trim() })
-          }
-          if (code !== 0 && code !== 1 && code !== 2) {
-            return yield* failure(stderr.trim() || `ripgrep failed with code ${code}`)
-          }
-          return { items: code === 1 ? [] : rows, truncated: false, partial: code === 2 }
+          return yield* handleExitCode(code, stderr, input.pattern, rows)
         }),
       )
       const abortable = input.signal ? program.pipe(Effect.raceFirst(waitForAbort(input.signal))) : program
