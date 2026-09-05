@@ -189,20 +189,34 @@ function FieldLabel(props: ParentProps<FieldLabelProps>) {
   )
 }
 
-function FieldPrefix(props: ParentProps<ComponentProps<"div">>) {
-  const [local, rest] = splitProps(props, ["class", "classList", "children"])
-  const field = useField()
+type FieldAffixProps = ParentProps<ComponentProps<"div">> & {
+  affixId: string
+  dataSlot: "field-v2-prefix" | "field-v2-suffix"
+  register: () => void
+  unregister: () => void
+}
+
+function FieldAffix(props: FieldAffixProps) {
+  const [local, rest] = splitProps(props, [
+    "affixId",
+    "dataSlot",
+    "register",
+    "unregister",
+    "class",
+    "classList",
+    "children",
+  ])
 
   onMount(() => {
-    field.registerPrefix()
-    onCleanup(() => field.unregisterPrefix())
+    local.register()
+    onCleanup(() => local.unregister())
   })
 
   return (
     <div
       {...rest}
-      id={field.prefixId}
-      data-slot="field-v2-prefix"
+      id={local.affixId}
+      data-slot={local.dataSlot}
       classList={{
         ...local.classList,
         [local.class ?? ""]: !!local.class,
@@ -213,27 +227,31 @@ function FieldPrefix(props: ParentProps<ComponentProps<"div">>) {
   )
 }
 
-function FieldSuffix(props: ParentProps<ComponentProps<"div">>) {
-  const [local, rest] = splitProps(props, ["class", "classList", "children"])
+function FieldPrefix(props: ParentProps<ComponentProps<"div">>) {
   const field = useField()
 
-  onMount(() => {
-    field.registerSuffix()
-    onCleanup(() => field.unregisterSuffix())
-  })
+  return (
+    <FieldAffix
+      {...props}
+      affixId={field.prefixId}
+      dataSlot="field-v2-prefix"
+      register={field.registerPrefix}
+      unregister={field.unregisterPrefix}
+    />
+  )
+}
+
+function FieldSuffix(props: ParentProps<ComponentProps<"div">>) {
+  const field = useField()
 
   return (
-    <div
-      {...rest}
-      id={field.suffixId}
-      data-slot="field-v2-suffix"
-      classList={{
-        ...local.classList,
-        [local.class ?? ""]: !!local.class,
-      }}
-    >
-      {local.children}
-    </div>
+    <FieldAffix
+      {...props}
+      affixId={field.suffixId}
+      dataSlot="field-v2-suffix"
+      register={field.registerSuffix}
+      unregister={field.unregisterSuffix}
+    />
   )
 }
 
