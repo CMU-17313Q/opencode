@@ -125,6 +125,12 @@ type Data = {
   integrations: Map<ID, Entry>
 }
 
+function isSameMethod(a: Method, b: Method): boolean {
+  if (a.type !== b.type) return false
+  if (a.type !== "oauth" || b.type !== "oauth") return true
+  return a.id === b.id
+}
+
 export type Draft = {
   list: () => readonly Ref[]
   get: (id: ID) => Ref | undefined
@@ -255,11 +261,9 @@ export const locationLayer = Layer.effect(
             if (!draft.integrations.has(implementation.integrationID)) {
               draft.integrations.set(implementation.integrationID, current)
             }
-            const index = current.methods.findIndex((method) => {
-              if (method.type !== implementation.method.type) return false
-              if (method.type !== "oauth" || implementation.method.type !== "oauth") return true
-              return method.id === implementation.method.id
-            })
+            const index = current.methods.findIndex((method) =>
+              isSameMethod(method as Method, implementation.method),
+            )
             if (index === -1) current.methods.push(implementation.method as Types.DeepMutable<Method>)
             else current.methods[index] = implementation.method as Types.DeepMutable<Method>
             if (implementation.method.type === "oauth") {
@@ -272,11 +276,7 @@ export const locationLayer = Layer.effect(
           remove: (integrationID, method) => {
             const current = draft.integrations.get(integrationID)
             if (!current) return
-            const index = current.methods.findIndex((candidate) => {
-              if (candidate.type !== method.type) return false
-              if (candidate.type !== "oauth" || method.type !== "oauth") return true
-              return candidate.id === method.id
-            })
+            const index = current.methods.findIndex((candidate) => isSameMethod(candidate as Method, method))
             if (index !== -1) current.methods.splice(index, 1)
             if (method.type === "oauth") current.implementations.delete(method.id)
           },
