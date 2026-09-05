@@ -21,10 +21,13 @@ export function serverStatusDotClass(input: {
   attention?: boolean
   issue: boolean
 }) {
-  if (input.serverHealth === false) return "bg-icon-critical-base"
-  if (!input.ready || input.serverHealth === undefined) return "bg-border-weak-base"
-  if (input.attention) return "bg-v2-background-bg-accent"
-  if (input.issue) return "bg-icon-warning-base"
-  if (input.serverHealth === true) return "bg-icon-success-base"
-  return "bg-border-weak-base"
+  const rules: Array<[boolean, string]> = [
+    [input.serverHealth === false, "bg-icon-critical-base"],
+    [!input.ready || input.serverHealth === undefined, "bg-border-weak-base"],
+    [input.attention === true, "bg-v2-background-bg-accent"],
+    [input.issue, "bg-icon-warning-base"],
+    [input.serverHealth === true, "bg-icon-success-base"],
+  ]
+
+  return rules.find(([condition]) => condition)?.[1] ?? "bg-border-weak-base"
 }
