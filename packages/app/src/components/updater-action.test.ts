@@ -2,8 +2,13 @@ import { describe, expect, test } from "bun:test"
 import { updaterAction } from "./updater-action"
 
 describe("updaterAction", () => {
-  test("disables update actions when the platform has no updater", () => {
-    expect(updaterAction(undefined)).toEqual({ label: "settings.updates.action.checkNow" })
+  test("disables update actions when the updater is unavailable or disabled", () => {
+    expect(updaterAction(undefined)).toEqual({
+      label: "settings.updates.action.checkNow",
+    })
+    expect(updaterAction({ status: "disabled" })).toEqual({
+      label: "settings.updates.action.checkNow",
+    })
   })
 
   test("projects updater transitions into one settings action", () => {
@@ -11,7 +16,9 @@ describe("updaterAction", () => {
       label: "settings.updates.action.checkNow",
       run: "check",
     })
-    expect(updaterAction({ status: "checking" })).toEqual({ label: "settings.updates.action.checking" })
+    expect(updaterAction({ status: "checking" })).toEqual({
+      label: "settings.updates.action.checking",
+    })
     expect(updaterAction({ status: "downloading", version: "2.0.0" })).toEqual({
       label: "settings.updates.action.downloading",
     })
@@ -21,6 +28,17 @@ describe("updaterAction", () => {
     })
     expect(updaterAction({ status: "installing", version: "2.0.0" })).toEqual({
       label: "settings.updates.action.installing",
+    })
+  })
+
+  test("allows another check after completion or an error", () => {
+    expect(updaterAction({ status: "up-to-date" })).toEqual({
+      label: "settings.updates.action.checkNow",
+      run: "check",
+    })
+    expect(updaterAction({ status: "error", message: "Update failed" })).toEqual({
+      label: "settings.updates.action.checkNow",
+      run: "check",
     })
   })
 })
