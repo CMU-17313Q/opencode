@@ -62,4 +62,20 @@ describe("Ripgrep", () => {
       (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
     ),
   )
+
+  it.live("reports an unparseable regex as an InvalidPatternError", () =>
+    Effect.acquireUseRelease(
+      Effect.promise(() => tmpdir()),
+      (tmp) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() => fs.writeFile(path.join(tmp.path, "file.txt"), "content\n"))
+
+          const error = yield* (yield* Ripgrep.Service)
+            .grep({ cwd: tmp.path, pattern: "(", limit: 10 })
+            .pipe(Effect.flip)
+          expect(error._tag).toBe("Ripgrep.InvalidPatternError")
+        }),
+      (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+    ),
+  )
 })
