@@ -341,108 +341,128 @@ function loadWindow(win: BrowserWindow, html: string) {
 
   void win.loadURL(`${rendererProtocol}://${rendererHost}/${html}`)
 }
+  
+type RecoveryAction = "relaunch" | "export-logs" | "keep-waiting" | "quit"
 
-function wireWindowRecovery(win: BrowserWindow, name: string) {
-  let showing = false
-  const sampler = createUnresponsiveSampler(win, name)
+export type RecoveryContext = {
+  win: BrowserWindow
+  name: string
+  sampler: ReturnType<typeof createUnresponsiveSampler>
+  state: { showing: boolean }
+}
 
-  type RecoveryAction = "relaunch" | "export-logs" | "keep-waiting" | "quit"
-  const handle = async (action: RecoveryAction | undefined, wait: boolean) => {
-    if (action === "export-logs") {
-      const sampling = sampler.stopAndFlush()
-      await exportDebugLogs().catch((error) => writeLog("main", "failed to export debug logs", { error }, "error"))
-      if (wait && sampling) sampler.start()
-      return true
-    }
-    if (action === "relaunch") {
-      sampler.stopAndFlush()
-      relaunchHandler()
-      return false
-    }
-    if (action === "quit") {
-      sampler.stopAndFlush()
-      app.quit()
-    }
+export type LoadFailureDetails = {
+  event: string
+  errorCode: number
+  errorDescription: string
+  validatedURL: string
+  isMainFrame: boolean
+}
+
+export async function handleRecoveryAction(
+  action: RecoveryAction | undefined,
+  wait: boolean,
+  sampler: ReturnType<typeof createUnresponsiveSampler>,
+): Promise<boolean> {
+  if (action === "export-logs") {
+    const sampling = sampler.stopAndFlush()
+    await exportDebugLogs().catch((error) => writeLog("main", "failed to export debug logs", { error }, "error"))
+    if (wait && sampling) sampler.start()
+    return true
+  }
+  if (action === "relaunch") {
+    sampler.stopAndFlush()
+    relaunchHandler()
     return false
   }
+  if (action === "quit") {
+    sampler.stopAndFlush()
+    app.quit()
+  }
+  return false
+}
 
-  const show = async (message: string, detail: string, wait: boolean) => {
-    if (showing || win.isDestroyed()) return
-    showing = true
-    try {
-      while (!win.isDestroyed()) {
-        const actions: { id: RecoveryAction; label: string }[] = wait
-          ? [
-              { id: "relaunch", label: nativeT("desktop.recovery.action.relaunch") },
-              { id: "export-logs", label: nativeT("desktop.recovery.action.exportLogs") },
-              { id: "keep-waiting", label: nativeT("desktop.recovery.action.keepWaiting") },
-            ]
-          : [
-              { id: "relaunch", label: nativeT("desktop.recovery.action.relaunch") },
-              { id: "export-logs", label: nativeT("desktop.recovery.action.exportLogs") },
-              { id: "quit", label: nativeT("desktop.recovery.action.quit") },
-            ]
-        const result = await dialog.showMessageBox(win, {
-          type: "warning",
-          buttons: actions.map((action) => action.label),
-          defaultId: 0,
-          cancelId: 2,
-          message,
-          detail,
-        })
-        if (await handle(actions[result.response]?.id, wait)) continue
-        return
-      }
-    } finally {
-      showing = false
+export async function showRecoveryDialog(ctx: RecoveryContext, message: string, detail: string, wait: boolean) {
+  const { win, sampler, state } = ctx
+  if (state.showing || win.isDestroyed()) return
+  state.showing = true
+  try {
+    while (!win.isDestroyed()) {
+      const actions: { id: RecoveryAction; label: string }[] = wait
+        ? [
+            { id: "relaunch", label: nativeT("desktop.recovery.action.relaunch") },
+            { id: "export-logs", label: nativeT("desktop.recovery.action.exportLogs") },
+            { id: "keep-waiting", label: nativeT("desktop.recovery.action.keepWaiting") },
+          ]
+        : [
+            { id: "relaunch", label: nativeT("desktop.recovery.action.relaunch") },
+            { id: "export-logs", label: nativeT("desktop.recovery.action.exportLogs") },
+            { id: "quit", label: nativeT("desktop.recovery.action.quit") },
+          ]
+      const result = await dialog.showMessageBox(win, {
+        type: "warning",
+        buttons: actions.map((action) => action.label),
+        defaultId: 0,
+        cancelId: 2,
+        message,
+        detail,
+      })
+      if (await handleRecoveryAction(actions[result.response]?.id, wait, sampler)) continue
+      return
     }
+  } finally {
+    state.showing = false
   }
+}
 
-  const failed = (
-    event: string,
-    errorCode: number,
-    errorDescription: string,
-    validatedURL: string,
-    isMainFrame: boolean,
-  ) => {
-    writeLog(
-      "window",
-      "renderer load failed",
-      {
-        window: name,
-        event,
-        errorCode,
-        errorDescription,
-        validatedURL,
-        currentURL: safeWindowURL(win),
-        isMainFrame,
-      },
-      "error",
-    )
+export function handleLoadFailure(ctx: RecoveryContext, details: LoadFailureDetails) {
+  const { win, name } = ctx
+  const { event, errorCode, errorDescription, validatedURL, isMainFrame } = details
+  writeLog(
+    "window",
+    "renderer load failed",
+    {
+      window: name,
+      event,
+      errorCode,
+      errorDescription,
+      validatedURL,
+      currentURL: safeWindowURL(win),
+      isMainFrame,
+    },
+    "error",
+  )
 
-    if (!isMainFrame || errorCode === -3) return
-    void show(
-      nativeT("desktop.recovery.loadFailed"),
-      nativeT("desktop.recovery.loadFailed.detail", {
-        window: name,
-        url: validatedURL,
-        code: errorCode,
-        description: errorDescription,
-      }),
-      false,
-    )
-  }
+  if (!isMainFrame || errorCode === -3) return
+  void showRecoveryDialog(
+    ctx,
+    nativeT("desktop.recovery.loadFailed"),
+    nativeT("desktop.recovery.loadFailed.detail", {
+      window: name,
+      url: validatedURL,
+      code: errorCode,
+      description: errorDescription,
+    }),
+    false,
+  )
+}
+
+export function wireWindowRecovery(win: BrowserWindow, name: string) {
+  const state = { showing: false }
+  const sampler = createUnresponsiveSampler(win, name)
+  const ctx: RecoveryContext = { win, name, sampler, state }
 
   win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-    failed("did-fail-load", errorCode, errorDescription, validatedURL, isMainFrame)
+    handleLoadFailure(ctx, { event: "did-fail-load", errorCode, errorDescription, validatedURL, isMainFrame })
   })
   win.webContents.on("did-fail-provisional-load", (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-    failed("did-fail-provisional-load", errorCode, errorDescription, validatedURL, isMainFrame)
+    handleLoadFailure(ctx, { event: "did-fail-provisional-load", errorCode, errorDescription, validatedURL, isMainFrame })
   })
   win.webContents.on("render-process-gone", (_event, details) => {
     sampler.stopAndFlush()
     writeLog("window", "renderer process gone", { window: name, currentURL: safeWindowURL(win), details }, "error")
-    void show(
+    void showRecoveryDialog(
+      ctx,
       nativeT("desktop.recovery.terminated"),
       nativeT("desktop.recovery.terminated.detail", {
         window: name,
@@ -455,7 +475,7 @@ function wireWindowRecovery(win: BrowserWindow, name: string) {
   win.on("unresponsive", () => {
     writeLog("window", "renderer unresponsive", { window: name, currentURL: safeWindowURL(win) }, "error")
     sampler.start()
-    void show(nativeT("desktop.recovery.unresponsive"), nativeT("desktop.recovery.unresponsive.detail"), true)
+    void showRecoveryDialog(ctx, nativeT("desktop.recovery.unresponsive"), nativeT("desktop.recovery.unresponsive.detail"), true)
   })
   win.on("responsive", () => {
     writeLog("window", "renderer responsive", { window: name, currentURL: safeWindowURL(win) }, "error")

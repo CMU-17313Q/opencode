@@ -1,0 +1,8 @@
+{
+  "name": "opencode Dev Container",
+  "image": "oven/bun:1",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/python:1": {}
+  }
+}
