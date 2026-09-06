@@ -28,6 +28,8 @@ describe("acp tool conversion", () => {
     expect(toToolKind("read")).toBe("read")
     expect(toToolKind("task")).toBe("think")
     expect(toToolKind("custom_tool")).toBe("other")
+    expect(toToolKind("BASH")).toBe("execute")
+    expect(toToolKind("Apply_Patch")).toBe("edit")
   })
 
   test("extracts file locations from tool input", () => {
