@@ -38,14 +38,26 @@ export function classifySessionSwitch(samples: SessionSwitchSample[]) {
   }
 }
 
+function hasValidBottomAnchor(sample: SessionSwitchSample) {
+  if (sample.bottomAnchorRequired === false) {
+    return true
+  }
+
+  return Math.abs(sample.bottomErrorPx ?? Infinity) <= 1
+}
+
 export function isCorrectDestination(sample: SessionSwitchSample) {
-  return (
-    sample.destination.length > 0 &&
-    sample.source.length === 0 &&
-    sample.last &&
-    sample.requiredPartVisible !== false &&
-    (sample.bottomAnchorRequired === false || Math.abs(sample.bottomErrorPx ?? Infinity) <= 1)
-  )
+  const hasDestination = sample.destination.length > 0
+  const hasNoSource = sample.source.length === 0
+  const isLastSample = sample.last
+  const requiredPartIsVisible = sample.requiredPartVisible !== false
+  const bottomAnchorIsValid = hasValidBottomAnchor(sample)
+
+  if (!hasDestination || !hasNoSource || !isLastSample || !requiredPartIsVisible) {
+    return false
+  }
+
+  return bottomAnchorIsValid
 }
 
 export function isStableSessionSwitch(samples: SessionSwitchSample[]) {
