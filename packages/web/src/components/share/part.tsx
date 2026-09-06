@@ -139,7 +139,7 @@ export function Part(props: PartProps) {
             <div data-component="assistant-text-markdown">
               <ContentMarkdown expand={props.last} text={props.part.text} />
             </div>
-            {props.last && props.message.role === "assistant" && props.message.time.completed && (
+            {props.last && props.message.time.completed && (
               <Footer
                 title={DateTime.fromMillis(props.message.time.completed)
                   .setLocale(normalizeLocale(messages.locale))
