@@ -50,22 +50,15 @@ function localeFromCookie(header: string | null) {
 function localeFromAcceptLanguage(header: string | null) {
   if (!header) return "root"
 
-  const items = header
-    .split(",")
-    .map((raw) => raw.trim())
-    .filter(Boolean)
-    .map((raw) => {
-      const parts = raw.split(";").map((x) => x.trim())
-      const lang = parts[0] ?? ""
-      const q = parts
-        .slice(1)
-        .find((x) => x.startsWith("q="))
-        ?.slice(2)
-      return {
-        lang,
-        q: q ? Number.parseFloat(q) : 1,
-      }
-    })
+  const items = header.split(",").map((raw) => {
+    const [language = "", ...parameters] = raw.split(";")
+    const quality = parameters.find((parameter) => parameter.trim().startsWith("q="))
+    const value = quality?.trim().slice(2)
+    return {
+      lang: language.trim(),
+      q: value ? Number.parseFloat(value) : 1,
+    }
+  })
     .sort((a, b) => b.q - a.q)
 
   const locale = items
