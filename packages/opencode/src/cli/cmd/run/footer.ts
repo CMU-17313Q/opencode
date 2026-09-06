@@ -119,49 +119,47 @@ function createEmptySubagentState(): FooterSubagentState {
   }
 }
 
-function eventPatch(next: FooterEvent): FooterPatch | undefined {
-  if (next.type === "queue") {
-    return { queue: next.queue }
+export function eventPatch(next: FooterEvent): FooterPatch | undefined {
+  let patch: FooterPatch | undefined
+
+  switch (next.type) {
+    case "queue":
+      patch = { queue: next.queue }
+      break
+    case "first":
+      patch = { first: next.first }
+      break
+    case "model":
+      patch = { model: next.model }
+      break
+    case "turn.send":
+      patch = {
+        phase: "running",
+        status: "sending prompt",
+        queue: next.queue,
+        interrupt: 0,
+        exit: 0,
+      }
+      break
+    case "turn.wait":
+      patch = {
+        phase: "running",
+        status: "waiting for assistant",
+      }
+      break
+    case "turn.idle":
+      patch = {
+        phase: "idle",
+        status: "",
+        queue: next.queue,
+      }
+      break
+    case "stream.patch":
+      patch = next.patch
+      break
   }
 
-  if (next.type === "first") {
-    return { first: next.first }
-  }
-
-  if (next.type === "model") {
-    return { model: next.model }
-  }
-
-  if (next.type === "turn.send") {
-    return {
-      phase: "running",
-      status: "sending prompt",
-      queue: next.queue,
-      interrupt: 0,
-      exit: 0,
-    }
-  }
-
-  if (next.type === "turn.wait") {
-    return {
-      phase: "running",
-      status: "waiting for assistant",
-    }
-  }
-
-  if (next.type === "turn.idle") {
-    return {
-      phase: "idle",
-      status: "",
-      queue: next.queue,
-    }
-  }
-
-  if (next.type === "stream.patch") {
-    return next.patch
-  }
-
-  return undefined
+  return patch
 }
 
 export class RunFooter implements FooterApi {
