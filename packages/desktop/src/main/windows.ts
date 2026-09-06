@@ -447,7 +447,7 @@ export function handleLoadFailure(ctx: RecoveryContext, details: LoadFailureDeta
   )
 }
 
-function wireWindowRecovery(win: BrowserWindow, name: string) {
+export function wireWindowRecovery(win: BrowserWindow, name: string) {
   const state = { showing: false }
   const sampler = createUnresponsiveSampler(win, name)
   const ctx: RecoveryContext = { win, name, sampler, state }

@@ -1,11 +1,13 @@
 import { describe, expect, test, mock, beforeEach } from "bun:test"
 import { app, dialog } from "electron"
+import type { BrowserWindow } from "electron"
 import { exportDebugLogs, write as writeLog } from "./logging"
 import {
   handleRecoveryAction,
   handleLoadFailure,
   setRelaunchHandler,
   showRecoveryDialog,
+  wireWindowRecovery,
   type RecoveryContext,
 } from "./windows"
 
@@ -25,12 +27,26 @@ function fakeSampler() {
 
 function fakeWin(destroyed = false) {
   const state = { destroyed }
+  const winHandlers = new Map<string, (...args: any[]) => void>()
+  const webContentsHandlers = new Map<string, (...args: any[]) => void>()
   return {
     isDestroyed: () => state.destroyed,
-    webContents: { isDestroyed: () => state.destroyed, getURL: () => "https://example.com" },
+    on: mock((event: string, handler: (...args: any[]) => void) => {
+      winHandlers.set(event, handler)
+    }),
+    webContents: {
+      isDestroyed: () => state.destroyed,
+      getURL: () => "https://example.com",
+      isDevToolsOpened: () => true,
+      on: mock((event: string, handler: (...args: any[]) => void) => {
+        webContentsHandlers.set(event, handler)
+      }),
+    },
     destroy: () => {
       state.destroyed = true
     },
+    winHandlers,
+    webContentsHandlers,
   }
 }
 
@@ -205,5 +221,116 @@ describe("handleLoadFailure", () => {
     })
     expect(writeLog).toHaveBeenCalledTimes(1)
     expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("wireWindowRecovery", () => {
+  beforeEach(() => {
+    ;(writeLog as ReturnType<typeof mock>).mockClear()
+    dialog.showMessageBox = mock(async () => ({ response: 0 }))
+  })
+
+  test("registers the expected webContents and window listeners", () => {
+    const win = fakeWin()
+    wireWindowRecovery(win as unknown as BrowserWindow, "main")
+
+    expect([...win.webContentsHandlers.keys()].sort()).toEqual(
+      ["console-message", "did-fail-load", "did-fail-provisional-load", "preload-error", "render-process-gone"].sort(),
+    )
+    expect([...win.winHandlers.keys()]).toEqual(expect.arrayContaining(["unresponsive", "responsive", "closed"]))
+  })
+
+  test("did-fail-load: logs the failure and shows the recovery dialog for main-frame errors", () => {
+    const win = fakeWin()
+    wireWindowRecovery(win as unknown as BrowserWindow, "main")
+
+    win.webContentsHandlers.get("did-fail-load")?.({}, -6, "ERR_FAILED", "https://example.com", true)
+
+    expect(writeLog).toHaveBeenCalledTimes(1)
+    expect(writeLog).toHaveBeenCalledWith("window", "renderer load failed", expect.anything(), "error")
+    expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
+  })
+
+  test("did-fail-load: logs but skips the dialog when aborted (-3)", () => {
+    const win = fakeWin()
+    wireWindowRecovery(win as unknown as BrowserWindow, "main")
+
+    win.webContentsHandlers.get("did-fail-load")?.({}, -3, "ERR_ABORTED", "https://example.com", true)
+
+    expect(writeLog).toHaveBeenCalledTimes(1)
+    expect(dialog.showMessageBox).not.toHaveBeenCalled()
+  })
+
+  test("did-fail-provisional-load: logs the failure and shows the recovery dialog", () => {
+    const win = fakeWin()
+    wireWindowRecovery(win as unknown as BrowserWindow, "main")
+
+    win.webContentsHandlers.get("did-fail-provisional-load")?.({}, -6, "ERR_FAILED", "https://example.com", true)
+
+    expect(writeLog).toHaveBeenCalledTimes(1)
+    expect(writeLog).toHaveBeenCalledWith("window", "renderer load failed", expect.anything(), "error")
+    expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
+  })
+
+  test("render-process-gone: flushes the sampler, logs, and shows the recovery dialog", () => {
+    const win = fakeWin()
+    wireWindowRecovery(win as unknown as BrowserWindow, "main")
+
+    win.webContentsHandlers.get("render-process-gone")?.({}, { reason: "crashed", exitCode: 1 })
+
+    expect(writeLog).toHaveBeenCalledTimes(1)
+    expect(writeLog).toHaveBeenCalledWith("window", "renderer process gone", expect.anything(), "error")
+    expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
+  })
+
+  test("unresponsive: logs, starts sampling, and shows the recovery dialog", () => {
+    const win = fakeWin()
+    wireWindowRecovery(win as unknown as BrowserWindow, "main")
+
+    win.winHandlers.get("unresponsive")?.()
+
+    expect(writeLog).toHaveBeenCalledTimes(1)
+    expect(writeLog).toHaveBeenCalledWith("window", "renderer unresponsive", expect.anything(), "error")
+    expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
+  })
+
+  test("responsive: logs and flushes the sampler", () => {
+    const win = fakeWin()
+    wireWindowRecovery(win as unknown as BrowserWindow, "main")
+
+    win.winHandlers.get("responsive")?.()
+
+    expect(writeLog).toHaveBeenCalledTimes(1)
+    expect(writeLog).toHaveBeenCalledWith("window", "renderer responsive", expect.anything(), "error")
+    expect(dialog.showMessageBox).not.toHaveBeenCalled()
+  })
+
+  test("console-message: logs pty output when the message mentions terminal", () => {
+    const win = fakeWin()
+    wireWindowRecovery(win as unknown as BrowserWindow, "main")
+
+    win.webContentsHandlers.get("console-message")?.({}, "info", "opened a terminal session", 1, "file.js")
+
+    expect(writeLog).toHaveBeenCalledTimes(1)
+    expect(writeLog).toHaveBeenCalledWith("pty", "console", expect.anything())
+  })
+
+  test("console-message: does not log when neither message nor sourceId mention terminal", () => {
+    const win = fakeWin()
+    wireWindowRecovery(win as unknown as BrowserWindow, "main")
+
+    win.webContentsHandlers.get("console-message")?.({}, "info", "normal log line", 1, "file.js")
+
+    expect(writeLog).not.toHaveBeenCalled()
+  })
+
+  test("preload-error: logs the preload error", () => {
+    const win = fakeWin()
+    wireWindowRecovery(win as unknown as BrowserWindow, "main")
+
+    win.webContentsHandlers.get("preload-error")?.({}, "/path/preload.js", new Error("boom"))
+
+    expect(writeLog).toHaveBeenCalledTimes(1)
+    expect(writeLog).toHaveBeenCalledWith("preload", "preload error", expect.anything(), "error")
   })
 })
