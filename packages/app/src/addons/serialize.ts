@@ -67,14 +67,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 }
 
 const isBuffer = (value: unknown): value is IBuffer => {
-  if (!isRecord(value)) return false
-  if (typeof value.length !== "number") return false
-  if (typeof value.cursorX !== "number") return false
-  if (typeof value.cursorY !== "number") return false
-  if (typeof value.baseY !== "number") return false
-  if (typeof value.viewportY !== "number") return false
-  if (typeof value.getLine !== "function") return false
-  if (typeof value.getNullCell !== "function") return false
+  if ((!isRecord(value)) || (typeof value.length !== "number")
+  || (typeof value.cursorX !== "number") 
+  || (typeof value.cursorY !== "number") 
+  || (typeof value.baseY !== "number")
+  || (typeof value.viewportY !== "number")
+  || (typeof value.getLine !== "function")
+  || (typeof value.getNullCell !== "function"))  return false
   return true
 }
 
