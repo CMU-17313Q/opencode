@@ -77,7 +77,11 @@ async function mountPrompt(input: {
                   <DialogProvider>
                     {input.refocus ? (
                       <>
-                        <textarea ref={(value: TextareaRenderable) => (background = value)} />
+                        <box>
+                          <box>
+                            <textarea ref={(value: TextareaRenderable) => (background = value)} />
+                          </box>
+                        </box>
                         <DialogOpener />
                       </>
                     ) : (
@@ -119,7 +123,7 @@ async function mountPrompt(input: {
   }
 }
 
-test("restores focus after closing a dialog", async () => {
+test("restores focus to a descendant renderable after closing a dialog", async () => {
   await using tmp = await tmpdir()
   const prompt = await mountPrompt({
     root: tmp.path,
