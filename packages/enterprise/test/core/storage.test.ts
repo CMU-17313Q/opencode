@@ -1,64 +1,105 @@
-import { describe, expect, test, afterAll } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Storage } from "../../src/core/storage"
 
-describe("core.storage", () => {
-  test("should list files with after and before range", async () => {
-    await Storage.write(["test", "users", "user1"], { name: "user1" })
-    await Storage.write(["test", "users", "user2"], { name: "user2" })
-    await Storage.write(["test", "users", "user3"], { name: "user3" })
-    await Storage.write(["test", "users", "user4"], { name: "user4" })
-    await Storage.write(["test", "users", "user5"], { name: "user5" })
+// Fake AwsClient: records every fetch, returns queued responses in order.
+function makeClient() {
+  const calls: { url: string; init?: RequestInit }[] = []
+  let queue: Response[] = []
+  return {
+    calls,
+    respond(responses: (Response | (() => Response))[]) {
+      queue = responses.map((r) => (typeof r === "function" ? r() : r))
+    },
+    fetch(url: string, init?: RequestInit): Promise<Response> {
+      calls.push({ url, init })
+      return Promise.resolve(queue.shift() ?? new Response("unexpected call", { status: 200 }))
+    },
+  }
+}
 
-    const result = await Storage.list({ prefix: ["test", "users"], after: "user2", before: "user4" })
+function xml(keys: string[]) {
+  return `<ListBucketResult>` + keys.map((k) => `<Key>${k}</Key>`).join("") + `</ListBucketResult>`
+}
 
-    expect(result).toEqual([["test", "users", "user3"]])
+const endpoint = "https://s3.us-east-1.amazonaws.com"
+const bucket = "test-bucket"
+
+describe("core.storage (mock AwsClient, no bucket)", () => {
+  test("read: 200 returns body text", async () => {
+    const client = makeClient()
+    client.respond([new Response("hello", { status: 200 })])
+    const adapter = Storage.forClient(client as any, endpoint, bucket)
+    expect(await adapter.read("a/b.json")).toBe("hello")
+    expect(client.calls[0].url).toBe(`${endpoint}/${bucket}/a/b.json`)
   })
 
-  test("should list files with after only", async () => {
-    const result = await Storage.list({ prefix: ["test", "users"], after: "user3" })
-
-    expect(result).toEqual([
-      ["test", "users", "user4"],
-      ["test", "users", "user5"],
-    ])
+  test("read: 404 returns undefined", async () => {
+    const client = makeClient()
+    client.respond([new Response("", { status: 404 })])
+    const adapter = Storage.forClient(client as any, endpoint, bucket)
+    expect(await adapter.read("a/b.json")).toBeUndefined()
   })
 
-  test("should list files with limit", async () => {
-    const result = await Storage.list({ prefix: ["test", "users"], limit: 3 })
-
-    expect(result).toEqual([
-      ["test", "users", "user1"],
-      ["test", "users", "user2"],
-      ["test", "users", "user3"],
-    ])
+  test("read: 500 throws (assertOk)", async () => {
+    const client = makeClient()
+    client.respond([new Response("boom", { status: 500 })])
+    const adapter = Storage.forClient(client as any, endpoint, bucket)
+    await expect(adapter.read("a/b.json")).rejects.toThrow(/500/)
   })
 
-  test("should list all files without prefix", async () => {
-    const result = await Storage.list()
-
-    expect(result.length).toBeGreaterThan(0)
+  test("write: PUTs JSON body with content-type, ok on 200", async () => {
+    const client = makeClient()
+    client.respond([new Response("", { status: 200 })])
+    const adapter = Storage.forClient(client as any, endpoint, bucket)
+    await adapter.write("a/b.json", '{"x":1}')
+    const c = client.calls[0]
+    expect(c.init?.method).toBe("PUT")
+    expect(c.init?.body).toBe('{"x":1}')
+    expect((c.init?.headers as Record<string, string>)["Content-Type"]).toBe("application/json")
   })
 
-  test("should list all files with prefix", async () => {
-    const result = await Storage.list({ prefix: ["test", "users"] })
-
-    expect(result).toEqual([
-      ["test", "users", "user1"],
-      ["test", "users", "user2"],
-      ["test", "users", "user3"],
-      ["test", "users", "user4"],
-      ["test", "users", "user5"],
-    ])
+  test("write: 500 throws (assertOk)", async () => {
+    const client = makeClient()
+    client.respond([new Response("boom", { status: 500 })])
+    const adapter = Storage.forClient(client as any, endpoint, bucket)
+    await expect(adapter.write("a/b.json", "{}")).rejects.toThrow(/500/)
   })
 
-  afterAll(async () => {
-    const testFiles = await Storage.list({ prefix: ["test"] })
+  test("remove: DELETEs, ok on 200", async () => {
+    const client = makeClient()
+    client.respond([new Response("", { status: 200 })])
+    const adapter = Storage.forClient(client as any, endpoint, bucket)
+    await adapter.remove("a/b.json")
+    expect(client.calls[0].init?.method).toBe("DELETE")
+  })
 
-    for (const file of testFiles) {
-      await Storage.remove(file)
-    }
+  test("remove: 404 throws (assertOk)", async () => {
+    const client = makeClient()
+    client.respond([new Response("", { status: 404 })])
+    const adapter = Storage.forClient(client as any, endpoint, bucket)
+    await expect(adapter.remove("a/b.json")).rejects.toThrow(/404/)
+  })
 
-    const remainingFiles = await Storage.list({ prefix: ["test"] })
-    expect(remainingFiles).toEqual([])
+  test("list: parses <Key> entries (parseKeys)", async () => {
+    const client = makeClient()
+    client.respond([new Response(xml(["p/u1.json", "p/u2.json", "p/u3.json"]), { status: 200 })])
+    const adapter = Storage.forClient(client as any, endpoint, bucket)
+    expect(await adapter.list({ prefix: "p" })).toEqual(["p/u1.json", "p/u2.json", "p/u3.json"])
+    expect(client.calls[0].url).toContain("list-type=2")
+  })
+
+  test("list: before excludes keys >= beforePath (strict <)", async () => {
+    const client = makeClient()
+    client.respond([new Response(xml(["p/u1.json", "p/u2.json", "p/u3.json"]), { status: 200 })])
+    const adapter = Storage.forClient(client as any, endpoint, bucket)
+    expect(await adapter.list({ prefix: "p/", before: "u2" })).toEqual(["p/u1.json"])
+  })
+  
+
+  test("list: 500 throws (assertOk)", async () => {
+    const client = makeClient()
+    client.respond([new Response("boom", { status: 500 })])
+    const adapter = Storage.forClient(client as any, endpoint, bucket)
+    await expect(adapter.list({ prefix: "p" })).rejects.toThrow(/500/)
   })
 })

@@ -9,59 +9,91 @@ export namespace Storage {
     list(options?: { prefix?: string; limit?: number; after?: string; before?: string }): Promise<string[]>
   }
 
-  function createAdapter(client: AwsClient, endpoint: string, bucket: string): Adapter {
-    const base = `${endpoint}/${bucket}`
-    return {
-      async read(path: string): Promise<string | undefined> {
-        const response = await client.fetch(`${base}/${path}`)
-        if (response.status === 404) return undefined
-        if (!response.ok) throw new Error(`Failed to read ${path}: ${response.status}`)
-        return response.text()
-      },
+  type ListOptions = { prefix?: string; limit?: number; after?: string; before?: string }
 
-      async write(path: string, value: string): Promise<void> {
-        const response = await client.fetch(`${base}/${path}`, {
-          method: "PUT",
-          body: value,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        })
-        if (!response.ok) throw new Error(`Failed to write ${path}: ${response.status}`)
-      },
+  // --- module-level helpers (extracted from createAdapter) ---
 
-      async remove(path: string): Promise<void> {
-        const response = await client.fetch(`${base}/${path}`, {
-          method: "DELETE",
-        })
-        if (!response.ok) throw new Error(`Failed to remove ${path}: ${response.status}`)
-      },
+  function assertOk(response: Response, label: string): void {
+    if (!response.ok) throw new Error(`Failed to ${label}: ${response.status}`)
+  }
 
-      async list(options?: { prefix?: string; limit?: number; after?: string; before?: string }): Promise<string[]> {
-        const prefix = options?.prefix || ""
-        const params = new URLSearchParams({ "list-type": "2", prefix })
-        if (options?.limit) params.set("max-keys", options.limit.toString())
-        if (options?.after) {
-          const afterPath = prefix + options.after + ".json"
-          params.set("start-after", afterPath)
-        }
-        const response = await client.fetch(`${base}?${params}`)
-        if (!response.ok) throw new Error(`Failed to list ${prefix}: ${response.status}`)
+  function parseKeys(xml: string): string[] {
+    const keys: string[] = []
+    const regex = /<Key>([^<]+)<\/Key>/g
+    let match
+    while ((match = regex.exec(xml)) !== null) {
+      keys.push(match[1])
+    }
+    return keys
+  }
+
+  function readAt(client: AwsClient, base: string, path: string): Promise<string | undefined> {
+    return client.fetch(`${base}/${path}`).then((response) => {
+      if (response.status === 404) return undefined
+      assertOk(response, `read ${path}`)
+      return response.text()
+    })
+  }
+
+  function writeAt(client: AwsClient, base: string, path: string, value: string): Promise<void> {
+    return client
+      .fetch(`${base}/${path}`, {
+        method: "PUT",
+        body: value,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+      .then((response) => {
+        assertOk(response, `write ${path}`)
+      })
+  }
+
+  function removeAt(client: AwsClient, base: string, path: string): Promise<void> {
+    return client
+      .fetch(`${base}/${path}`, {
+        method: "DELETE",
+      })
+      .then((response) => {
+        assertOk(response, `remove ${path}`)
+      })
+  }
+
+  function listAt(client: AwsClient, base: string, options?: ListOptions): Promise<string[]> {
+    const prefix = options?.prefix || ""
+    const params = new URLSearchParams({ "list-type": "2", prefix })
+    if (options?.limit) params.set("max-keys", options.limit.toString())
+    if (options?.after) {
+      const afterPath = prefix + options.after + ".json"
+      params.set("start-after", afterPath)
+    }
+    return client
+      .fetch(`${base}?${params}`)
+      .then(async (response) => {
+        assertOk(response, `list ${prefix}`)
         const xml = await response.text()
-        const keys: string[] = []
-        const regex = /<Key>([^<]+)<\/Key>/g
-        let match
-        while ((match = regex.exec(xml)) !== null) {
-          keys.push(match[1])
-        }
+        const keys = parseKeys(xml)
         if (options?.before) {
           const beforePath = prefix + options.before + ".json"
           return keys.filter((key) => key < beforePath)
         }
         return keys
-      },
+      })
+  }
+
+  // --- adapter factory (now just wires the helpers) ---
+
+  function createAdapter(client: AwsClient, endpoint: string, bucket: string): Adapter {
+    const base = `${endpoint}/${bucket}`
+    return {
+      read: (path) => readAt(client, base, path),
+      write: (path, value) => writeAt(client, base, path, value),
+      remove: (path) => removeAt(client, base, path),
+      list: (options) => listAt(client, base, options),
     }
   }
+
+  // --- backend constructors (unchanged) ---
 
   function s3(): Adapter {
     const bucket = process.env.OPENCODE_STORAGE_BUCKET!
@@ -74,7 +106,7 @@ export namespace Storage {
     return createAdapter(client, `https://s3.${region}.amazonaws.com`, bucket)
   }
 
-  function r2() {
+  function r2(): Adapter {
     const accountId = process.env.OPENCODE_STORAGE_ACCOUNT_ID!
     const client = new AwsClient({
       accessKeyId: process.env.OPENCODE_STORAGE_ACCESS_KEY_ID!,
@@ -92,6 +124,17 @@ export namespace Storage {
 
   function resolve(key: string[]) {
     return key.join("/") + ".json"
+  }
+
+  // --- public API (signatures unchanged) ---
+
+  /**
+   * Build an adapter around an AwsClient. Exported so tests can drive
+   * readAt/writeAt/removeAt/listAt/parseKeys/assertOk with a fake client,
+   * no OPENCODE_STORAGE_* env or real bucket required.
+   */
+  export function forClient(client: AwsClient, endpoint: string, bucket: string): Adapter {
+    return createAdapter(client, endpoint, bucket)
   }
 
   export async function read<T>(key: string[]) {

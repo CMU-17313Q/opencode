@@ -1,19 +1,17 @@
 {
-    "name": "Bun",
-    "image": "ghcr.io/nhaef/devcontainer-bun:latest",
-    "features": {
-        "ghcr.io/devcontainers/features/common-utils:2.5.9": {
-            "installZsh": false,
-            "configureZshAsDefaultShell": false
-        }
-    },
-
-    "postCreateCommand": "sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends lcov",
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "dbaeumer.vscode-eslint"
-            ]
-        }
+  "name": "Bun",
+  "image": "ghcr.io/nhaef/devcontainer-bun:latest",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false,
+      "configureZshAsDefaultShell": false
     }
-}
+  },
+  "postCreateCommand": "sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends lcov",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }}
