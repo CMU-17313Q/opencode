@@ -35,39 +35,25 @@ export type ImageAttachment = {
   readonly data: string
 }
 
+const TOOL_KIND_BY_NAME: Record<string, ToolKind> = {
+  bash: "execute",
+  shell: "execute",
+  webfetch: "fetch",
+  edit: "edit",
+  apply_patch: "edit",
+  patch: "edit",
+  write: "edit",
+  grep: "search",
+  glob: "search",
+  context: "search",
+  context7_resolve_library_id: "search",
+  context7_get_library_docs: "search",
+  read: "read",
+  task: "think",
+}
+
 export function toToolKind(toolName: string): ToolKind {
-  const tool = toolName.toLocaleLowerCase()
-
-  switch (tool) {
-    case "bash":
-    case "shell":
-      return "execute"
-
-    case "webfetch":
-      return "fetch"
-
-    case "edit":
-    case "apply_patch":
-    case "patch":
-    case "write":
-      return "edit"
-
-    case "grep":
-    case "glob":
-    case "context":
-    case "context7_resolve_library_id":
-    case "context7_get_library_docs":
-      return "search"
-
-    case "read":
-      return "read"
-
-    case "task":
-      return "think"
-
-    default:
-      return "other"
-  }
+  return TOOL_KIND_BY_NAME[toolName.toLocaleLowerCase()] ?? "other"
 }
 
 export function toLocations(toolName: string, input: ToolInput, cwd?: string): ToolCallLocation[] {

@@ -7,3 +7,9 @@ coverage-html
 .qlty
 packages/sdk/js/tsconfig.tsbuildinfo
 test-results/.last-run.json
+coverage/
+coverage-src/
+*.lcov
+lcov.info
+.DS_Store
+smells.txt
