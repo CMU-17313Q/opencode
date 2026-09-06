@@ -87,19 +87,8 @@ const toOptimisticPart = (part: PromptRequestPart, sessionID: string, messageID:
     messageID,
   }
 }
-
-export function buildRequestParts(input: BuildRequestPartsInput) {
-  const requestParts: PromptRequestPart[] = input.text.trim()
-    ? [
-        {
-          id: Identifier.ascending("part"),
-          type: "text",
-          text: input.text,
-        },
-      ]
-    : []
-
-  const files = input.prompt.filter(isFileAttachment).map((attachment) => {
+function buildFileParts(input: BuildRequestPartsInput) {
+  return input.prompt.filter(isFileAttachment).map((attachment) => {
     const path = absolute(input.sessionDirectory, attachment.path)
     const source = attachment.source
       ? {
@@ -128,8 +117,10 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
       source,
     } satisfies PromptRequestPart
   })
+}
 
-  const agents = input.prompt.filter(isAgentAttachment).map((attachment) => {
+function buildAgentParts(input: BuildRequestPartsInput): PromptRequestPart[] {
+  return input.prompt.filter(isAgentAttachment).map((attachment) => {
     return {
       id: Identifier.ascending("part"),
       type: "agent",
@@ -141,15 +132,32 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
       },
     } satisfies PromptRequestPart
   })
+}
 
-  const used = new Set(files.map((part) => part.url))
-  const context = input.context.flatMap((item) => {
+function buildContextMentionParts(sessionDirectory: string, comment: string, used: Set<string>): PromptRequestPart[] {
+  return parseCommentMentions(comment).flatMap((path) => {
+    const url = `file://${encodeFilePath(absolute(sessionDirectory, path))}`
+    if (used.has(url)) return []
+    used.add(url)
+    return [
+      {
+        id: Identifier.ascending("part"),
+        type: "file",
+        mime: "text/plain",
+        url,
+        filename: getFilename(path),
+      } satisfies PromptRequestPart,
+    ]
+  })
+}
+
+function buildContextParts(input: BuildRequestPartsInput, used: Set<string>): PromptRequestPart[] {
+  return input.context.flatMap((item) => {
     const path = absolute(input.sessionDirectory, item.path)
     const url = `file://${encodeFilePath(path)}${fileQuery(item.selection)}`
     const comment = item.comment?.trim()
     if (!comment && used.has(url)) return []
     used.add(url)
-
     const filePart = {
       id: Identifier.ascending("part"),
       type: "file",
@@ -157,24 +165,8 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
       url,
       filename: getFilename(item.path),
     } satisfies PromptRequestPart
-
     if (!comment) return [filePart]
-
-    const mentions = parseCommentMentions(comment).flatMap((path) => {
-      const url = `file://${encodeFilePath(absolute(input.sessionDirectory, path))}`
-      if (used.has(url)) return []
-      used.add(url)
-      return [
-        {
-          id: Identifier.ascending("part"),
-          type: "file",
-          mime: "text/plain",
-          url,
-          filename: getFilename(path),
-        } satisfies PromptRequestPart,
-      ]
-    })
-
+    const mentions = buildContextMentionParts(input.sessionDirectory, comment, used)
     return [
       {
         id: Identifier.ascending("part"),
@@ -193,8 +185,10 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
       ...mentions,
     ]
   })
+}
 
-  const images = input.images.map((attachment) => {
+function buildImageParts(input: BuildRequestPartsInput): PromptRequestPart[] {
+  return input.images.map((attachment) => {
     return {
       id: Identifier.ascending("part"),
       type: "file",
@@ -203,9 +197,24 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
       filename: attachment.sourcePath ?? attachment.filename,
     } satisfies PromptRequestPart
   })
+}
 
+export function buildRequestParts(input: BuildRequestPartsInput) {
+  const requestParts: PromptRequestPart[] = input.text.trim()
+    ? [
+        {
+          id: Identifier.ascending("part"),
+          type: "text",
+          text: input.text,
+        },
+      ]
+    : []
+  const files = buildFileParts(input)
+  const agents = buildAgentParts(input)
+  const used = new Set(files.map((part) => part.url))
+  const context = buildContextParts(input, used)
+  const images = buildImageParts(input)
   requestParts.push(...files, ...context, ...agents, ...images)
-
   return {
     requestParts,
     optimisticParts: requestParts.map((part) => toOptimisticPart(part, input.sessionID, input.messageID)),
