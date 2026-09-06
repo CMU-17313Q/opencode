@@ -41,6 +41,51 @@ describe("prompt-input history", () => {
     expect(dedupedComments).toBe(commentsOnly)
   })
 
+  const filePrompt = (path: string, selection?: { startLine: number; startChar: number; endLine: number; endChar: number }): Prompt => [
+    { type: "file", path, content: `@${path}`, start: 0, end: path.length + 1, selection },
+  ]
+  const agentPrompt = (name: string): Prompt => [{ type: "agent", name, content: `@${name}`, start: 0, end: name.length + 1 }]
+  const imagePrompt = (id: string): Prompt => [
+    { type: "image", id, filename: "img.png", mime: "image/png", blob: { id, url: `blob:${id}` } },
+  ]
+
+  test("prependHistoryEntry deduplicates file parts only when path and selection match", () => {
+    const selection = { startLine: 1, startChar: 0, endLine: 2, endChar: 3 }
+    const withFile = prependHistoryEntry([], filePrompt("src/a.ts", selection))
+    expect(withFile).toHaveLength(1)
+
+    const sameFile = prependHistoryEntry(withFile, filePrompt("src/a.ts", { ...selection }))
+    expect(sameFile).toBe(withFile)
+
+    const differentPath = prependHistoryEntry(withFile, filePrompt("src/b.ts", selection))
+    expect(differentPath).toHaveLength(2)
+
+    const differentSelection = prependHistoryEntry(withFile, filePrompt("src/a.ts", { ...selection, endChar: 9 }))
+    expect(differentSelection).toHaveLength(2)
+
+    const noSelection = prependHistoryEntry(withFile, filePrompt("src/a.ts", undefined))
+    expect(noSelection).toHaveLength(2)
+  })
+
+  test("prependHistoryEntry deduplicates agent and image parts by identity", () => {
+    const withAgent = prependHistoryEntry([], agentPrompt("reviewer"))
+    expect(prependHistoryEntry(withAgent, agentPrompt("reviewer"))).toBe(withAgent)
+    expect(prependHistoryEntry(withAgent, agentPrompt("other"))).toHaveLength(2)
+
+    const withImage = prependHistoryEntry([], imagePrompt("img-1"))
+    expect(prependHistoryEntry(withImage, imagePrompt("img-1"))).toBe(withImage)
+    expect(prependHistoryEntry(withImage, imagePrompt("img-2"))).toHaveLength(2)
+  })
+
+  test("prependHistoryEntry treats mismatched part types and comment fields as distinct entries", () => {
+    const withText = prependHistoryEntry([], text("hello"))
+    expect(prependHistoryEntry(withText, filePrompt("src/a.ts", undefined))).toHaveLength(2)
+
+    const withComment = prependHistoryEntry([], text("hello"), [comment("c1")])
+    const differentCommentText = prependHistoryEntry(withComment, text("hello"), [comment("c1", "different")])
+    expect(differentCommentText).toHaveLength(2)
+  })
+
   test("navigatePromptHistory restores saved prompt when moving down from newest", () => {
     const entries = [text("third"), text("second"), text("first")]
     const up = navigatePromptHistory({

@@ -112,39 +112,37 @@ function isCommentEqual(commentA: PromptHistoryComment, commentB: PromptHistoryC
   )
 }
 
+type PromptPart = Prompt[number]
+type FilePromptPart = Extract<PromptPart, { type: "file" }>
+
+function isFileSelectionEqual(a: FilePromptPart["selection"], b: FilePromptPart["selection"]) {
+  if (!a && !b) return true
+  if (!a || !b) return false
+  return a.startLine === b.startLine && a.startChar === b.startChar && a.endLine === b.endLine && a.endChar === b.endChar
+}
+
+const PART_COMPARATORS: Record<PromptPart["type"], (a: PromptPart, b: PromptPart) => boolean> = {
+  text: (a, b) => a.type === "text" && b.type === "text" && a.content === b.content,
+  file: (a, b) =>
+    a.type === "file" && b.type === "file" && a.path === b.path && isFileSelectionEqual(a.selection, b.selection),
+  agent: (a, b) => a.type === "agent" && b.type === "agent" && a.name === b.name,
+  image: (a, b) => a.type === "image" && b.type === "image" && a.id === b.id,
+}
+
+function arePromptPartsEqual(partA: PromptPart, partB: PromptPart): boolean {
+  if (partA.type !== partB.type) return false
+  return PART_COMPARATORS[partA.type](partA, partB)
+}
+
 function isPromptEqual(promptA: PromptHistoryStoredEntry, promptB: PromptHistoryStoredEntry) {
   const entryA = normalizePromptHistoryEntry(promptA)
   const entryB = normalizePromptHistoryEntry(promptB)
   if (entryA.prompt.length !== entryB.prompt.length) return false
-  for (let i = 0; i < entryA.prompt.length; i++) {
-    const partA = entryA.prompt[i]
-    const partB = entryB.prompt[i]
-    if (partA.type !== partB.type) return false
-    if (partA.type === "text" && partA.content !== (partB.type === "text" ? partB.content : "")) return false
-    if (partA.type === "file") {
-      if (partA.path !== (partB.type === "file" ? partB.path : "")) return false
-      const a = partA.selection
-      const b = partB.type === "file" ? partB.selection : undefined
-      const sameSelection =
-        (!a && !b) ||
-        (!!a &&
-          !!b &&
-          a.startLine === b.startLine &&
-          a.startChar === b.startChar &&
-          a.endLine === b.endLine &&
-          a.endChar === b.endChar)
-      if (!sameSelection) return false
-    }
-    if (partA.type === "agent" && partA.name !== (partB.type === "agent" ? partB.name : "")) return false
-    if (partA.type === "image" && partA.id !== (partB.type === "image" ? partB.id : "")) return false
-  }
   if (entryA.comments.length !== entryB.comments.length) return false
-  for (let i = 0; i < entryA.comments.length; i++) {
-    const commentA = entryA.comments[i]
-    const commentB = entryB.comments[i]
-    if (!commentA || !commentB || !isCommentEqual(commentA, commentB)) return false
-  }
-  return true
+  return (
+    entryA.prompt.every((part, i) => arePromptPartsEqual(part, entryB.prompt[i])) &&
+    entryA.comments.every((comment, i) => isCommentEqual(comment, entryB.comments[i]))
+  )
 }
 
 type HistoryNavInput = {

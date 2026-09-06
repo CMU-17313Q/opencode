@@ -1,0 +1,11 @@
+{
+    "name": "Default Linux Universal",
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+    "features": {
+        "ghcr.io/devcontainer-community/devcontainer-features/bun.sh:1": {}
+    },
+    "runArgs": [
+        "--memory=4g",
+        "--memory-swap=4g"
+    ]
+}
