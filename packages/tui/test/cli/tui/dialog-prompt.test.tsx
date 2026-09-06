@@ -5,7 +5,7 @@ import { testRender, useRenderer } from "@opentui/solid"
 import { expect, test } from "bun:test"
 import { mkdir } from "node:fs/promises"
 import path from "node:path"
-import { onCleanup } from "solid-js"
+import { onCleanup, onMount } from "solid-js"
 import { tmpdir } from "../../fixture/fixture"
 import { createTuiResolvedConfig } from "../../fixture/tui-runtime"
 import type { TuiKeybind } from "../../../src/config/keybind"
@@ -23,13 +23,14 @@ async function mountPrompt(input: {
   root: string
   keybinds: Partial<TuiKeybind.Keybinds>
   onConfirm: (value: string) => void
+  refocus?: boolean
 }) {
   const state = path.join(input.root, "state")
   await mkdir(state, { recursive: true })
   await Bun.write(path.join(state, "kv.json"), "{}")
 
   const [
-    { DialogProvider },
+    { DialogProvider, useDialog },
     { DialogPrompt },
     { KVProvider },
     { ThemeProvider },
@@ -45,6 +46,9 @@ async function mountPrompt(input: {
     import("../../../src/ui/toast"),
     import("../../../src/keymap"),
   ])
+
+  let background: TextareaRenderable | undefined
+  let dialogContext: ReturnType<typeof useDialog> | undefined
 
   function Harness() {
     const renderer = useRenderer()
@@ -71,7 +75,18 @@ async function mountPrompt(input: {
               <ThemeProvider mode="dark">
                 <ToastProvider>
                   <DialogProvider>
-                    <DialogPrompt title="Rename Session" value="draft" onConfirm={input.onConfirm} />
+                    {input.refocus ? (
+                      <>
+                        <box>
+                          <box>
+                            <textarea ref={(value: TextareaRenderable) => (background = value)} />
+                          </box>
+                        </box>
+                        <DialogOpener />
+                      </>
+                    ) : (
+                      <DialogPrompt title="Rename Session" value="draft" onConfirm={input.onConfirm} />
+                    )}
                   </DialogProvider>
                 </ToastProvider>
               </ThemeProvider>
@@ -82,14 +97,50 @@ async function mountPrompt(input: {
     )
   }
 
+  function DialogOpener() {
+    const dialog = useDialog()
+    dialogContext = dialog
+
+    onMount(() => {
+      setTimeout(() => {
+        if (!background) return
+        background.focus()
+        dialog.replace(() => <text>Test dialog</text>)
+      }, 1)
+    })
+
+    return null
+  }
+
   const app = await testRender(() => <Harness />, { kittyKeyboard: true })
   return {
     app,
+    background: () => background,
+    dialog: () => dialogContext,
     async cleanup() {
       app.renderer.destroy()
     },
   }
 }
+
+test("restores focus to a descendant renderable after closing a dialog", async () => {
+  await using tmp = await tmpdir()
+  const prompt = await mountPrompt({
+    root: tmp.path,
+    keybinds: {},
+    onConfirm: () => {},
+    refocus: true,
+  })
+
+  try {
+    await wait(() => prompt.dialog()?.stack.length === 1)
+    expect(prompt.app.renderer.currentFocusedRenderable).not.toBe(prompt.background())
+    prompt.dialog()?.clear()
+    await wait(() => prompt.app.renderer.currentFocusedRenderable === prompt.background())
+  } finally {
+    await prompt.cleanup()
+  }
+})
 
 test("dialog prompt submit wins when return is also input newline", async () => {
   await using tmp = await tmpdir()

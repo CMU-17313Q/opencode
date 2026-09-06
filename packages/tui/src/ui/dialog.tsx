@@ -85,19 +85,24 @@ function init() {
   })
 
   let focus: Renderable | null
+
+  function isDescendant(root: Renderable, node: Renderable | null) {
+    if (!node) return false
+    const stack: Renderable[] = [root]
+    while (stack.length) {
+      const cur = stack.pop()!
+      for (const child of cur.getChildren()) {
+        if (child === node) return true
+        stack.push(child)
+      }
+    }
+    return false
+  }
+
   function refocus() {
     setTimeout(() => {
-      if (!focus) return
-      if (focus.isDestroyed) return
-      function find(item: Renderable) {
-        for (const child of item.getChildren()) {
-          if (child === focus) return true
-          if (find(child)) return true
-        }
-        return false
-      }
-      const found = find(renderer.root)
-      if (!found) return
+      if (!focus || focus.isDestroyed) return
+      if (!isDescendant(renderer.root, focus)) return
       focus.focus()
     }, 1)
   }
