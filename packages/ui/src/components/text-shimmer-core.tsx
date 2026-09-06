@@ -1,7 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup, type JSX, type ValidComponent } from "solid-js"
 import { Dynamic } from "solid-js/web"
 
-
 export type TextShimmerCoreProps<T extends ValidComponent = "span"> = {
   text: string
   class?: string 
@@ -10,7 +9,7 @@ export type TextShimmerCoreProps<T extends ValidComponent = "span"> = {
   offset?: number
   component: string
   charSlot: string
-  bareSlot: string
+  baseSlot: string
   shimmerSlot: string
   swapVar: string
   indexVar: string
@@ -55,10 +54,10 @@ export const TextShimmerCore = <T extends ValidComponent = "span">(
       data-active={active() ? "true" : "false"}
       class={props.class}
       aria-label={text()}
-      style={buildTextSimmerStyle(props.swapVar, props.indexVar, swap, offset())}
+      style={buildTextShimmerStyle(props.swapVar, props.indexVar, swap, offset())}
     >
       <span data-slot={props.charSlot}>
-        <span data-slot={props.bareSlot} aria-hidden="true">
+        <span data-slot={props.baseSlot} aria-hidden="true">
           {text()}
         </span>
         <span data-slot={props.shimmerSlot} data-run={run() ? "true" : "false"} aria-hidden="true">
@@ -69,7 +68,7 @@ export const TextShimmerCore = <T extends ValidComponent = "span">(
   )
 }
 
-export function buildTextSimmerStyle(swapVar: string, indexVar: string, 
+export function buildTextShimmerStyle(swapVar: string, indexVar: string, 
   swap: number, offset: number) {
   return {[swapVar]: `${swap}ms`, [indexVar]: `${offset}` } as JSX.CSSProperties
 }
