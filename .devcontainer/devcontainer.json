@@ -1,0 +1,10 @@
+{
+    "name": "OpenCode Development",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "remoteUser": "node",
+    "features": {
+        "ghcr.io/shyim/devcontainers-features/bun:0": {}
+    }
+}

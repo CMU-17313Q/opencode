@@ -171,101 +171,105 @@ export const isBlockedMember = (name: string): boolean => blockedMemberNames.has
 export const copyIn = (value: unknown, label: string, preserveSandboxValues = false): unknown =>
   copyBounded(value, label, 0, new Set(), preserveSandboxValues)
 
-const copyBounded = (
-  value: unknown,
-  label: string,
-  depth: number,
-  seen: Set<object>,
-  preserveSandboxValues: boolean,
-): unknown => {
-  if (depth > MAX_VALUE_DEPTH) {
-    throw new ToolRuntimeError("InvalidDataValue", `${label} exceeds the maximum value depth of ${MAX_VALUE_DEPTH}.`)
-  }
-  if (
-    value === null ||
-    value === undefined ||
-    typeof value === "string" ||
-    typeof value === "boolean" ||
-    // NaN/Infinity are allowed to exist as in-sandbox intermediates (matching real JS and a real
-    // engine) so defensive guards like `Number.isNaN(x)` / `parseInt(x) || 0` can run. They are
-    // normalized to `null` when the value leaves the sandbox - see copyOut - exactly as
-    // JSON.stringify already does at any tool boundary.
-    typeof value === "number"
-  ) {
-    return value
-  }
+/** Sentinel meaning "this stage did not recognize the value"; distinct from any real copy result. */
+const NOT_HANDLED = Symbol("not-handled")
 
-  if (typeof value !== "object") {
-    throw new ToolRuntimeError("InvalidDataValue", `${label} must contain data only.`)
-  }
+const LEAF_TYPES = new Set(["string", "boolean", "number", "undefined"])
 
-  // An un-awaited promise never crosses a data checkpoint as `{}`; the diagnostic tells the
-  // model exactly how to fix the program instead.
-  if (value instanceof SandboxPromise) {
-    throw new ToolRuntimeError(
-      "InvalidDataValue",
-      `${label} contains an un-awaited Promise; await tool calls (e.g. \`const result = await tools.ns.tool(...)\`) before using their results.`,
-    )
-  }
+/**
+ * Data-only leaves that cross either mode untouched. NaN/Infinity are allowed to exist as
+ * in-sandbox intermediates (matching real JS and a real engine) so defensive guards like
+ * `Number.isNaN(x)` / `parseInt(x) || 0` can run. They are normalized to `null` when the value
+ * leaves the sandbox - see copyOut - exactly as JSON.stringify already does at any tool boundary.
+ */
+const isDataLeaf = (value: unknown): boolean => value === null || LEAF_TYPES.has(typeof value)
 
-  if (preserveSandboxValues) {
-    // Intra-sandbox checkpoints keep sandbox value instances alive as leaves; their contents
-    // are never walked here (Map/Set members are validated where mutation happens, and the
-    // real boundary still serializes them below).
-    if (
-      value instanceof SandboxDate ||
-      value instanceof SandboxRegExp ||
-      value instanceof SandboxMap ||
-      value instanceof SandboxSet ||
-      value instanceof SandboxURL ||
-      value instanceof SandboxURLSearchParams
-    ) {
-      return value
-    }
-    // Host instances cannot normally reach an intra-sandbox checkpoint (tool results cross
-    // the boundary first), but wrap them defensively rather than degrading to JSON forms.
-    if (value instanceof Date) return new SandboxDate(value.getTime())
-    if (value instanceof RegExp) return new SandboxRegExp(value.source, value.flags)
-    if (value instanceof Map) {
+const SANDBOX_VALUE_TYPES = [
+  SandboxDate,
+  SandboxRegExp,
+  SandboxMap,
+  SandboxSet,
+  SandboxURL,
+  SandboxURLSearchParams,
+] as const
+
+const isSandboxValue = (value: object): boolean => SANDBOX_VALUE_TYPES.some((type) => value instanceof type)
+
+/** Value types with no JSON form beyond `{}` - RegExp/Map/Set/URLSearchParams and their sandbox twins. */
+const OPAQUE_JSON_TYPES = [
+  SandboxRegExp,
+  SandboxMap,
+  SandboxSet,
+  SandboxURLSearchParams,
+  RegExp,
+  Map,
+  Set,
+  URLSearchParams,
+] as const
+
+const hasNoJsonForm = (value: object): boolean => OPAQUE_JSON_TYPES.some((type) => value instanceof type)
+
+type CopyChild = (item: unknown) => unknown
+
+type Matcher<T extends object> = readonly [
+  abstract new (...args: never) => T,
+  (value: T, copyChild: CopyChild) => unknown,
+]
+
+const matchType = (value: object, matchers: ReadonlyArray<Matcher<never>>, copyChild: CopyChild): unknown => {
+  const matched = matchers.find(([type]) => value instanceof type)
+  return matched ? (matched[1] as (value: object, copyChild: CopyChild) => unknown)(value, copyChild) : NOT_HANDLED
+}
+
+/**
+ * Host instances cannot normally reach an intra-sandbox checkpoint (tool results cross the
+ * boundary first), but wrap them defensively rather than degrading to JSON forms.
+ */
+const HOST_VALUE_WRAPPERS = [
+  [Date, (value: Date) => new SandboxDate(value.getTime())],
+  [RegExp, (value: RegExp) => new SandboxRegExp(value.source, value.flags)],
+  [
+    Map,
+    (value: Map<unknown, unknown>, copyChild: CopyChild) => {
       const wrapped = new SandboxMap()
-      for (const [key, item] of value.entries()) {
-        wrapped.map.set(copyBounded(key, label, depth + 1, seen, true), copyBounded(item, label, depth + 1, seen, true))
-      }
+      for (const [key, item] of value.entries()) wrapped.map.set(copyChild(key), copyChild(item))
       return wrapped
-    }
-    if (value instanceof Set) {
+    },
+  ],
+  [
+    Set,
+    (value: Set<unknown>, copyChild: CopyChild) => {
       const wrapped = new SandboxSet()
-      for (const item of value.values()) wrapped.set.add(copyBounded(item, label, depth + 1, seen, true))
+      for (const item of value.values()) wrapped.set.add(copyChild(item))
       return wrapped
-    }
-    if (value instanceof URL) return new SandboxURL(new URL(value.href))
-    if (value instanceof URLSearchParams) return new SandboxURLSearchParams(new URLSearchParams(value))
-  }
+    },
+  ],
+  [URL, (value: URL) => new SandboxURL(new URL(value.href))],
+  [URLSearchParams, (value: URLSearchParams) => new SandboxURLSearchParams(new URLSearchParams(value))],
+] as unknown as ReadonlyArray<Matcher<never>>
 
-  // Sandbox value types (and their host counterparts, which a host tool may legitimately
-  // return) serialize exactly as JSON.stringify would at the data boundary: Date/URL use
-  // toJSON(), while RegExp/Map/Set/URLSearchParams have no JSON form beyond {}.
-  if (value instanceof SandboxDate) {
-    return Number.isFinite(value.time) ? new Date(value.time).toISOString() : null
-  }
-  if (value instanceof Date) {
-    return Number.isFinite(value.getTime()) ? value.toISOString() : null
-  }
-  if (value instanceof SandboxURL) return value.url.href
-  if (value instanceof URL) return value.href
-  if (
-    value instanceof SandboxRegExp ||
-    value instanceof SandboxMap ||
-    value instanceof SandboxSet ||
-    value instanceof SandboxURLSearchParams ||
-    value instanceof RegExp ||
-    value instanceof Map ||
-    value instanceof Set ||
-    value instanceof URLSearchParams
-  ) {
-    return Object.create(null) as SafeObject
-  }
+const isoOrNull = (time: number): string | null => (Number.isFinite(time) ? new Date(time).toISOString() : null)
 
+/**
+ * Sandbox value types (and their host counterparts, which a host tool may legitimately return)
+ * serialize exactly as JSON.stringify would at the data boundary: Date/URL use toJSON(), while
+ * RegExp/Map/Set/URLSearchParams have no JSON form beyond {}.
+ */
+const BOUNDARY_SERIALIZERS = [
+  [SandboxDate, (value: SandboxDate) => isoOrNull(value.time)],
+  [Date, (value: Date) => isoOrNull(value.getTime())],
+  [SandboxURL, (value: SandboxURL) => value.url.href],
+  [URL, (value: URL) => value.href],
+] as unknown as ReadonlyArray<Matcher<never>>
+
+const serializeForBoundary = (value: object, copyChild: CopyChild): unknown => {
+  const serialized = matchType(value, BOUNDARY_SERIALIZERS, copyChild)
+  if (serialized !== NOT_HANDLED) return serialized
+  return hasNoJsonForm(value) ? (Object.create(null) as SafeObject) : NOT_HANDLED
+}
+
+/** Walks arrays and plain objects, enforcing circularity, prototype and blocked-property rules. */
+const copyContainer = (value: object, label: string, seen: Set<object>, copyChild: CopyChild): unknown => {
   if (seen.has(value)) {
     throw new ToolRuntimeError("InvalidDataValue", `${label} contains a circular value.`)
   }
@@ -273,7 +277,7 @@ const copyBounded = (
   seen.add(value)
 
   if (Array.isArray(value)) {
-    const copied = value.map((item) => copyBounded(item, label, depth + 1, seen, preserveSandboxValues))
+    const copied = value.map((item) => copyChild(item))
     seen.delete(value)
     return copied
   }
@@ -288,10 +292,55 @@ const copyBounded = (
     if (isBlockedMember(key)) {
       throw new ToolRuntimeError("InvalidDataValue", `${label} contains blocked property '${key}'.`)
     }
-    copied[key] = copyBounded(item, label, depth + 1, seen, preserveSandboxValues)
+    copied[key] = copyChild(item)
   }
   seen.delete(value)
   return copied
+}
+
+const copyBounded = (
+  value: unknown,
+  label: string,
+  depth: number,
+  seen: Set<object>,
+  preserveSandboxValues: boolean,
+): unknown => {
+  if (depth > MAX_VALUE_DEPTH) {
+    throw new ToolRuntimeError("InvalidDataValue", `${label} exceeds the maximum value depth of ${MAX_VALUE_DEPTH}.`)
+  }
+
+  if (isDataLeaf(value)) return value
+
+  if (value === null || typeof value !== "object") {
+    throw new ToolRuntimeError("InvalidDataValue", `${label} must contain data only.`)
+  }
+
+  // An un-awaited promise never crosses a data checkpoint as `{}`; the diagnostic tells the
+  // model exactly how to fix the program instead.
+  if (value instanceof SandboxPromise) {
+    throw new ToolRuntimeError(
+      "InvalidDataValue",
+      `${label} contains an un-awaited Promise; await tool calls (e.g. \`const result = await tools.ns.tool(...)\`) before using their results.`,
+    )
+  }
+
+  const copyChild = (item: unknown, preserve = preserveSandboxValues) =>
+    copyBounded(item, label, depth + 1, seen, preserve)
+
+  if (preserveSandboxValues) {
+    // Intra-sandbox checkpoints keep sandbox value instances alive as leaves; their contents
+    // are never walked here (Map/Set members are validated where mutation happens, and the
+    // real boundary still serializes them below).
+    if (isSandboxValue(value)) return value
+
+    const wrapped = matchType(value, HOST_VALUE_WRAPPERS, (item) => copyChild(item, true))
+    if (wrapped !== NOT_HANDLED) return wrapped
+  }
+
+  const serialized = serializeForBoundary(value, (item) => copyChild(item))
+  if (serialized !== NOT_HANDLED) return serialized
+
+  return copyContainer(value, label, seen, (item) => copyChild(item))
 }
 
 export const copyOut = (value: unknown, undefinedAsNull = false): unknown => {
