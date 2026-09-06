@@ -12,3 +12,4 @@ coverage-src/
 *.lcov
 lcov.info
 .DS_Store
+smells.txt
